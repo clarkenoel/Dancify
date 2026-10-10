@@ -16,3 +16,4 @@ outputs/
 debug_out/
 *.png
 !docs/**/*.png
+testdata/*.m4a
