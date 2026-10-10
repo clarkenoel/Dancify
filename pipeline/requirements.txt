@@ -1,0 +1,13 @@
+# Tested with CPython 3.10-3.12.
+numpy==1.26.4
+# MediaPipe requires opencv-contrib-python; do not also install a second cv2 wheel.
+opencv-contrib-python==4.11.0.86
+librosa==0.10.2.post1
+soundfile==0.12.1
+scipy==1.14.1
+mediapipe==0.10.18
+matplotlib==3.9.3
+jsonschema==4.23.0
+requests==2.32.3
+yt-dlp>=2024.12.23
+curl_cffi>=0.7.0

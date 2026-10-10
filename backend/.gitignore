@@ -6,3 +6,5 @@ data/dancify.db
 data/dancify.db-*
 data/songs/
 !data/.gitkeep
+data/demo_seed_manifest.json
+data/demo_seed_results.json

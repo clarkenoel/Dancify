@@ -1,0 +1,87 @@
+name: Pipeline
+
+on:
+  pull_request:
+    paths:
+      - "pipeline/**"
+      - "schema/dance.schema.json"
+      - "schema/dance.schema.json.json"
+      - ".github/workflows/pipeline.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "pipeline/**"
+      - "schema/dance.schema.json"
+      - "schema/dance.schema.json.json"
+      - ".github/workflows/pipeline.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: pipeline
+
+    steps:
+      - name: Checkout pipeline sources without media fixtures
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            pipeline
+            schema
+            .github/workflows/pipeline.yml
+            !pipeline/testdata/*.mp4
+            !pipeline/testdata/*.m4a
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            pipeline/requirements.txt
+            pipeline/requirements-dev.txt
+
+      - name: Install declared dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Check dependency consistency
+        run: python -m pip check
+
+      - name: Import pipeline stack
+        run: |
+          python - <<'PY'
+          from importlib.metadata import distributions
+
+          import cv2
+          import librosa
+          import mediapipe
+          import numpy
+          import scipy
+
+          opencv = [
+              distribution.metadata["Name"]
+              for distribution in distributions()
+              if distribution.metadata["Name"].lower().startswith("opencv")
+          ]
+          assert opencv == ["opencv-contrib-python"], opencv
+          print(
+              "imports ok:",
+              f"numpy={numpy.__version__}",
+              f"opencv={cv2.__version__}",
+              f"mediapipe={mediapipe.__version__}",
+              f"librosa={librosa.__version__}",
+              f"scipy={scipy.__version__}",
+          )
+          PY
+
+      - name: Run 27 deterministic pipeline tests
+        run: python -m pytest -q
+
+      - name: Compile pipeline sources and tests
+        run: python -m compileall -q dancify_pipeline debug main.py tests
