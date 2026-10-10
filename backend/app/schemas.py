@@ -1,22 +1,54 @@
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any, Literal
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+SongStatus = Literal["pending", "processing", "ready", "failed"]
+Judgment = Literal["PERFECT", "SUPER", "GOOD", "MISS", "LOST"]
+NonNegativeInt = Annotated[int, Field(ge=0)]
 
 
-class SongCreate(BaseModel):
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+def _http_url(value: str | None) -> str | None:
+    if value is None:
+        return None
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("source_url must be an absolute HTTP(S) URL")
+    return value
+
+
+class SongCreate(StrictModel):
     title: str = Field(..., min_length=1, max_length=256)
-    source_url: str | None = None
+    source_url: str | None = Field(default=None, min_length=1, max_length=1024)
+
+    @field_validator("source_url", mode="after")
+    @classmethod
+    def validate_source_url(cls, value: str | None) -> str | None:
+        return _http_url(value)
 
 
-class SongUpdate(BaseModel):
+class SongUpdate(StrictModel):
     title: str | None = Field(None, min_length=1, max_length=256)
-    source_url: str | None = None
-    status: str | None = None
-    error_message: str | None = None
-    bpm: float | None = None
-    duration: float | None = None
-    move_count: int | None = None
+    source_url: str | None = Field(default=None, min_length=1, max_length=1024)
+    status: SongStatus | None = None
+    error_message: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("source_url", mode="after")
+    @classmethod
+    def validate_source_url(cls, value: str | None) -> str | None:
+        return _http_url(value)
+
+    @model_validator(mode="after")
+    def reject_null_required_fields(self) -> "SongUpdate":
+        for field in ("title", "status"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} must not be null")
+        return self
 
 
 class SongOut(BaseModel):
@@ -39,13 +71,18 @@ class SongOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class PlayCreate(BaseModel):
+class PlayCreate(StrictModel):
     player_name: str = Field(default="anonymous", max_length=128)
-    score: int = 0
-    accuracy: float | None = None
-    max_combo: int | None = None
-    judgments: dict[str, int] | None = None
-    notes: str | None = None
+    score: int = Field(default=0, ge=0)
+    accuracy: float | None = Field(default=None, ge=0, le=1)
+    max_combo: int | None = Field(default=None, ge=0)
+    judgments: dict[Judgment, NonNegativeInt] | None = None
+    notes: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("player_name", mode="after")
+    @classmethod
+    def anonymous_for_blank_name(cls, value: str) -> str:
+        return value or "anonymous"
 
 
 class PlayOut(BaseModel):
