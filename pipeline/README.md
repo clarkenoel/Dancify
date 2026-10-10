@@ -96,12 +96,14 @@ See [`testdata/SOURCE.md`](testdata/SOURCE.md). YouTube/TikTok downloads were bo
 
 ## Contracts / web handoff
 
-- Schema loader prefers `../schema/dance.schema.json` and supports the repository's
-  legacy `dance.schema.json.json` filename.
+- Frozen schema on disk: `../schema/dance.schema.json.json` (legacy double
+  extension).
 - Normalization: [`NORMALIZATION.md`](NORMALIZATION.md).
-- **Person B start here:** [`WEB_HANDOFF.md`](WEB_HANDOFF.md) — how to `GET /songs/{id}/chart` + `/audio`, post plays, and match landmark space.
+- **Person B start here:** [`WEB_HANDOFF.md`](WEB_HANDOFF.md) — how to load the
+  complete `/video` + `/chart` + `/audio` bundle, post plays, and match landmark
+  space.
 - Audio is a **sidecar WAV** (schema has no audio field). All chart times use the
-  same zero-based timeline as `HTMLMediaElement.currentTime`.
+  same zero-based timeline as the reference `HTMLVideoElement.currentTime`.
 
 ## Hit density (Just Dance calibration)
 

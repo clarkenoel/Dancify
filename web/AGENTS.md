@@ -6,8 +6,8 @@ You are working on the game frontend only. Person B owns this directory.
 
 - TypeScript/React only. Do not touch `/pipeline`, `/firmware`, `/backend`, or `/schema`.
 - `WearableClient.ts` is the only module that touches Web Bluetooth.
-- Read `dance.json` — never write it. Prefer loading cached charts from the local song-cache API (`http://127.0.0.1:8000`, see `backend/README.md` / `PRD.md` §7) when a song is `status=ready`.
-- **Handoff from Person A:** read [`../pipeline/WEB_HANDOFF.md`](../pipeline/WEB_HANDOFF.md) and [`../pipeline/NORMALIZATION.md`](../pipeline/NORMALIZATION.md) — `GET /songs/{id}/chart` + `/audio`, then normalize live poses identically before compare.
+- Read `dance.json` — never write it. Prefer loading ready bundles from the local song-cache API (`http://127.0.0.1:8000`, see `backend/README.md` / `PRD.md.md` §7).
+- **Handoff from Person A:** read [`../pipeline/WEB_HANDOFF.md`](../pipeline/WEB_HANDOFF.md) and [`../pipeline/NORMALIZATION.md`](../pipeline/NORMALIZATION.md) — load `GET /songs/{id}/video`, `/chart`, and `/audio`, then normalize live poses identically before compare.
 - You may **call** `/backend` HTTP endpoints; do not rewrite the backend. POST play results to `/songs/{id}/plays` after a run.
 
 ## Commands
@@ -18,7 +18,8 @@ You are working on the game frontend only. Person B owns this directory.
 
 ## Rules
 
-- Master clock is `video.currentTime`.
+- Master clock is the reference `<video>` element's `currentTime`; never run a
+  separate audio element as a competing clock.
 - Pose comparison returns `null` for insufficient data.
 - Keyboard fallback always works.
 - Build `WearableClient.ts` against a fake event source (Phase 1). Real BLE swap in Phase 3.
@@ -40,4 +41,4 @@ You have access to the Figma MCP server. Use it to:
 
 ## Session Start
 
-Confirm you are in `/web`. Read `PRD.md` §4.2 for the game spec.
+Confirm you are in `/web`. Read `PRD.md.md` §4.2 for the game spec.

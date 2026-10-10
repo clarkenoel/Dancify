@@ -14,7 +14,7 @@
 ## Where
 
 - `/pipeline/main.py` — entry point
-- `/pipeline/test_data/` — test videos + expected outputs
+- `/pipeline/testdata/` — local test videos + provenance notes
 
 ## How It Was Verified
 
@@ -39,7 +39,7 @@
 
 ## Schema Changes
 
-- None. `dance.schema.json` unchanged.
+- None. `schema/dance.schema.json.json` unchanged.
 
 ## Rebase Notes
 

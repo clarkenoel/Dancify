@@ -4,7 +4,7 @@ Tiny **no-auth** API for the hackathon: store songs/clips, cache pipeline `dance
 
 **Stack:** FastAPI + SQLite + files under `backend/data/`.
 
-> Documented in `PRD.md` §7 / §8 / §14: local song cache is **in scope**. Still out of scope: user accounts, cloud DB/GPU, OAuth. This service is FastAPI + SQLite + disk files only.
+> Documented in `PRD.md.md` §7 / §8 / §14: local song cache is **in scope**. Still out of scope: user accounts, cloud DB/GPU, OAuth. This service is FastAPI + SQLite + disk files only.
 
 ## Run (plug and play)
 
@@ -74,13 +74,18 @@ curl -s -X PUT "http://127.0.0.1:8000/songs/<SONG_ID>/chart" \
   -F 'audio=@./audio.wav'
 ```
 
-4. **Game** checks `GET /songs/<id>` — when `status=ready`, pull the
-   chart/audio bundle instead of re-running:
+4. **Game** checks `GET /songs/<id>` — when `status=ready`, pull the complete
+   reference-video/chart/audio bundle instead of re-running:
 
 ```bash
+curl -s http://127.0.0.1:8000/songs/<SONG_ID>/video -o reference.mp4
 curl -s http://127.0.0.1:8000/songs/<SONG_ID>/chart -o dance.json
 curl -s http://127.0.0.1:8000/songs/<SONG_ID>/audio -o audio.wav
 ```
+
+The reference `<video>` element owns playback and is the sole gameplay clock.
+Do not play the audio sidecar independently; it is a bundled derivative for
+fallback/export use and must remain aligned to the video timeline.
 
 5. **After a playthrough**, record history:
 

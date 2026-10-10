@@ -1,27 +1,29 @@
-# AGENTS.md — Dancify
+# AGENTS.md.md — Dancify
 
-Read `PRD.md` (what to build), `TEAM.md` (ownership + git), and this file before any work.
+Read `PRD.md.md` (product vision and roadmap) and this file (ownership + git)
+before any work.
 
 ## Project
 
-Dancify turns any dance video into a playable rhythm game. Four parts:
+Dancify's product vision turns dance videos into a playable rhythm game. The
+current prep MVP accepts short, stable solo CFR clips. Four parts:
 - `/pipeline` — Python prep pipeline (video → `dance.json`)
 - `/backend` — Local FastAPI + SQLite song cache (clips, cached charts, play history; **no auth**)
 - `/web` — TypeScript/React game (plays `dance.json` with webcam scoring)
 - `/firmware` — ESP32 wearable (joystick + piezo, BLE, no scoring contribution)
 
-Build order: vision first, hardware later. See `PRD.md` §3.
+Build order: vision first, hardware later. See `PRD.md.md` §3.
 
 ## Hard Rules (Never Violate)
 
-1. `video.currentTime` is the master clock. Not `performance.now()`, not `AudioContext`.
+1. The reference `<video>` element's `currentTime` is the master clock. Not `performance.now()`, not `AudioContext`, and not a separately playing audio element.
 2. Pose comparison returns `null` for insufficient data, never `0`.
 3. Piezo uses LEDC peripheral, never `tone()`.
 4. Joystick ADC pins must be ADC1 (GPIO 32–39). Never ADC2.
 5. Keyboard fallback must always work.
 6. The wearable never contributes to the score.
 7. Camera frames never leave the browser.
-8. No **cloud** backend, no auth/accounts, no cloud inference, no model training. The local `/backend` FastAPI + SQLite song cache **is allowed** (see `PRD.md` §7 and `backend/README.md`).
+8. No **cloud** backend, no auth/accounts, no cloud inference, no model training. The local `/backend` FastAPI + SQLite song cache **is allowed** (see `PRD.md.md` §7 and `backend/README.md`).
 9. The game loop never imports from `/firmware`.
 10. Never edit `/schema` without an explicit "unfreeze the schema" instruction.
 
@@ -42,9 +44,9 @@ If you need a change outside your directory, stop and tell the human.
 
 ## Frozen Contracts
 
-- `dance.schema.json` — interface between A and B
+- `schema/dance.schema.json.json` — interface between A and B (legacy double extension)
 - `wearable.protocol.md` — interface between B and C
-- `types.ts` — TS mirror, changes with schema in same commit
+- `schema/type.ts` — TS mirror, changes with schema in same commit
 
 ## Git
 

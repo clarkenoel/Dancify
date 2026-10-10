@@ -1,10 +1,14 @@
 # Dancify
 
-A Just Dance clone that works on any dance video.
+A Just Dance-style rhythm game for dance videos.
 
 ## What it does
 
-Paste a TikTok or YouTube link, wait two minutes while the pipeline extracts the beat and hit moments, then play a rhythm game where your webcam tracks your body and a custom ESP32 wearable clicks the beat on your wrist.
+The product vision is to paste a TikTok or YouTube link, prepare a chart, and
+play with webcam tracking plus an ESP32 wearable. The shipped prep MVP currently
+supports short, stable, solo-dancer constant-frame-rate (CFR) clips. See
+[`pipeline/README.md`](pipeline/README.md) for supported inputs and deferred
+pipeline features.
 
 ## Repo structure
 
@@ -18,20 +22,24 @@ Paste a TikTok or YouTube link, wait two minutes while the pipeline extracts the
 
 ## Setup
 
-See `PRD.md` and `TEAM.md`. The pipeline needs Python 3.10+, FFmpeg, and `librosa`/`mediapipe`. The song-cache API needs Python 3.10+ (`backend/requirements.txt`). The game needs Node 18+. The firmware needs the Arduino IDE with the ESP32 board package.
+See `PRD.md.md` for the product vision and roadmap, and `AGENTS.md.md` for
+ownership and repository rules. The pipeline needs Python 3.10+, FFmpeg, and
+`librosa`/`mediapipe`. The song-cache API needs Python 3.10+
+(`backend/requirements.txt`). The planned game needs Node 18+; the planned
+firmware needs the Arduino IDE with the ESP32 board package.
 
-**Backend note:** We intentionally run a small local API so songs and pipeline outputs can be stored once and reused (saves compute) and so play history sticks to each song. Stack: **FastAPI + SQLite + files under `backend/data/`**. No user auth. Details in `backend/README.md` and `PRD.md` §7.
+**Backend note:** We intentionally run a small local API so songs and pipeline outputs can be stored once and reused (saves compute) and so play history sticks to each song. Stack: **FastAPI + SQLite + files under `backend/data/`**. No user auth. Details in `backend/README.md` and `PRD.md.md` §7.
 
 ## Run
 
 Pipeline: `python pipeline/main.py --input <video> --output dance.json`
 Backend: `cd backend && uvicorn app.main:app --reload --port 8000`
-Game: `cd web && npm install && npm run dev`
-Firmware: flash `firmware/wearable.ino` to an ESP32.
+Game and firmware: not yet scaffolded in this repository.
 
 ## Documentation
 
-- `PRD.md` — product spec and roadmap
-- `AGENTS.md` — rules for AI coding agents
-- `TEAM.md` — ownership and git discipline
+- `PRD.md.md` — product vision, target architecture, and roadmap
+- `AGENTS.md.md` — ownership, git discipline, and rules for AI coding agents
+- `pipeline/README.md` — shipped prep MVP and supported inputs
+- `pipeline/WEB_HANDOFF.md` — complete video/chart/audio browser handoff
 - `schema/` — frozen contracts
