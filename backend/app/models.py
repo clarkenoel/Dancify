@@ -52,6 +52,9 @@ class Play(Base):
     __tablename__ = "plays"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    client_session_id: Mapped[str | None] = mapped_column(String(36), nullable=True, unique=True)
+    mode: Mapped[str] = mapped_column(String(32), default="camera", nullable=False)
+    tracking_coverage: Mapped[float | None] = mapped_column(Float, nullable=True)
     song_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("songs.id", ondelete="CASCADE"), nullable=False, index=True
     )

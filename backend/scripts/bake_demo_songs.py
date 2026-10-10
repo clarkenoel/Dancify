@@ -555,6 +555,7 @@ def _seed_demo(
         files=[
             ("chart", chart, "application/json"),
             ("audio", extracted_audio, "audio/wav"),
+            ("report", chart.with_name("dance.report.json"), "application/json"),
         ],
     )
     if ready.get("status") != "ready":

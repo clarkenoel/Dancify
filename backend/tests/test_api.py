@@ -62,6 +62,17 @@ def chart(*, bpm: float = 120, move_id: str = "m0") -> dict[str, object]:
     }
 
 
+def valid_report(payload=None):
+    payload = payload or chart()
+    return {
+        "version": "1.0",
+        "readiness": {"cache_ready_by_default": True, "synthetic_timing": False, "solo_cfr_mvp": True},
+        "normalization": {"coordinate_space": "mediapipe_image", "aspect_ratio": 1.0, "x_z_scaled_by_aspect_ratio": True},
+        "timing": {"source": "audio", "synthetic": False, "bpm": payload["bpm"], "beat_times": payload["beat_times"]},
+        "tracking": {"valid_frames": 100, "total_frames": 100, "valid_frame_ratio": 1.0, "longest_invalid_seconds": 0.0, "trailing_invalid_seconds": 0.0},
+    }
+
+
 def create_song(client: TestClient) -> dict[str, object]:
     response = client.post(
         "/songs",
@@ -88,6 +99,7 @@ def upload_bundle(
                 "application/json",
             ),
             "audio": ("audio.wav", audio, "audio/wav"),
+            "report": ("dance.report.json", json.dumps(valid_report(payload) if isinstance(payload, dict) and "bpm" in payload else valid_report()).encode(), "application/json"),
         },
     )
 
@@ -684,7 +696,7 @@ def test_lifespan_worker_runs_pipeline_subprocess(
             video.write_bytes(Path(args.input).read_bytes())
             chart_path.write_text(json.dumps({chart()!r}))
             audio.write_bytes(b"audio")
-            report.write_text(json.dumps({{"version": "1.0", "status": "ready"}}))
+            report.write_text(json.dumps({valid_report()!r}))
             args.manifest.write_text(json.dumps({{
                 "status": "succeeded",
                 "video": str(video.resolve()),

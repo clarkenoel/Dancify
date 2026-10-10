@@ -199,6 +199,9 @@ def _play_out(play: Play) -> PlayOut:
             judgments = None
     return PlayOut(
         id=play.id,
+        client_session_id=play.client_session_id,
+        mode=play.mode,
+        tracking_coverage=play.tracking_coverage,
         song_id=play.song_id,
         bundle_id=play.bundle_id,
         player_name=play.player_name,
@@ -608,14 +611,10 @@ async def upload_chart(
             except EmptyUploadError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
         else:
-            raw_report = json.dumps(
-                {
-                    "version": "1.0",
-                    "status": "ready",
-                    "readiness": {"cache_ready_by_default": True},
-                    "provenance": {"source": "manual_cache_upload"},
-                }
-            ).encode()
+            raise HTTPException(
+                status_code=422,
+                detail="Current dance.report.json is required; regenerate legacy charts",
+            )
 
         folder = song_dir(song_id)
         staged_upload = folder / f".manual-upload-{uuid.uuid4().hex}"
@@ -946,6 +945,10 @@ def record_play(
     song_id: str, body: PlayCreate, db: Session = Depends(get_db)
 ) -> PlayOut:
     song = _get_song(db, song_id)
+    if body.client_session_id:
+        previous = db.scalar(select(Play).where(Play.client_session_id == body.client_session_id))
+        if previous is not None:
+            return _matching_play(previous, song_id, body)
     bundle_id = body.bundle_id or song.active_bundle_id
     if not bundle_id or bundle_asset_path(song_id, bundle_id, "chart") is None:
         raise HTTPException(
@@ -953,6 +956,9 @@ def record_play(
         )
     play = Play(
         id=str(uuid.uuid4()),
+        client_session_id=body.client_session_id,
+        mode=body.mode,
+        tracking_coverage=body.tracking_coverage,
         song_id=song_id,
         bundle_id=bundle_id,
         player_name=body.player_name,
@@ -967,10 +973,30 @@ def record_play(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
+        if body.client_session_id:
+            previous = db.scalar(select(Play).where(Play.client_session_id == body.client_session_id))
+            if previous is not None:
+                return _matching_play(previous, song_id, body)
         raise HTTPException(
             status_code=409, detail="Song was deleted before play could be recorded"
         ) from exc
     db.refresh(play)
+    return _play_out(play)
+
+
+def _matching_play(play: Play, song_id: str, body: PlayCreate) -> PlayOut:
+    """A retry may return the same result, but never reuse a key for new data."""
+    expected = {
+        "song_id": song_id, "bundle_id": body.bundle_id or play.bundle_id,
+        "player_name": body.player_name, "score": body.score,
+        "accuracy": body.accuracy, "max_combo": body.max_combo,
+        "notes": body.notes, "mode": body.mode,
+        "tracking_coverage": body.tracking_coverage,
+    }
+    if any(getattr(play, key) != value for key, value in expected.items()) or (
+        (json.loads(play.judgments_json) if play.judgments_json else None) != body.judgments
+    ):
+        raise HTTPException(status_code=409, detail="Session ID already used for different results")
     return _play_out(play)
 
 

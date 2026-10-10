@@ -58,6 +58,9 @@ def migrate_sqlite(database_engine: Engine) -> None:
         },
         "plays": {
             "bundle_id": "VARCHAR(36)",
+            "client_session_id": "VARCHAR(36)",
+            "mode": "VARCHAR(32) NOT NULL DEFAULT 'camera'",
+            "tracking_coverage": "FLOAT",
         },
         "preparation_jobs": {
             "start_time": "FLOAT",
@@ -81,6 +84,10 @@ def migrate_sqlite(database_engine: Engine) -> None:
                     )
         connection.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS ix_plays_bundle_id ON plays (bundle_id)"
+        )
+        connection.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_plays_client_session "
+            "ON plays (client_session_id)"
         )
         connection.exec_driver_sql(
             "UPDATE songs SET source_video_path = video_path "

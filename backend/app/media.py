@@ -30,7 +30,7 @@ def _probe(path: Path) -> dict[str, Any]:
             "-show_entries",
             (
                 "format=format_name,duration,start_time:"
-                "stream=codec_type,codec_name,duration,start_time,nb_read_frames"
+                "stream=codec_type,codec_name,duration,start_time,nb_read_frames,width,height"
             ),
             "-of",
             "json",
@@ -141,7 +141,8 @@ def validate_bundle_media(
     if not math.isfinite(expected_duration) or expected_duration <= 0:
         raise MediaValidationError("Chart duration must be positive")
 
-    allowed_delta = max(tolerance, expected_duration * 0.02)
+    # Percentage tolerances grow beyond an entire scoring window on long clips.
+    allowed_delta = tolerance
     durations = {
         "video": video_duration,
         "embedded_audio": embedded_audio_duration,
@@ -155,6 +156,17 @@ def validate_bundle_media(
                 f"(tolerance {allowed_delta:.3f}s)"
             )
 
+    for label, stream in (("video", video_stream), ("embedded_audio", embedded_audio), ("audio", sidecar_audio)):
+        try:
+            start = float(stream.get("start_time", 0))
+        except (TypeError, ValueError) as exc:
+            raise MediaValidationError(f"Invalid {label} start time") from exc
+        if not math.isfinite(start) or abs(start) > tolerance:
+            raise MediaValidationError(f"{label} must use the zero-based video timeline")
+    width, height = video_stream.get("width"), video_stream.get("height")
+    if not isinstance(width, int) or not isinstance(height, int) or width <= 0 or height <= 0:
+        raise MediaValidationError("Reference video dimensions are invalid")
+
     return {
         "container": "mp4",
         "video_codec": "h264",
@@ -163,4 +175,5 @@ def validate_bundle_media(
         "embedded_audio_duration": embedded_audio_duration,
         "sidecar_duration": sidecar_duration,
         "tolerance": allowed_delta,
+        "aspect_ratio": width / height,
     }

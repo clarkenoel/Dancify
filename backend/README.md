@@ -214,7 +214,7 @@ Optional environment variables:
 - `DANCIFY_MAX_AUDIO_BYTES`
 - `DANCIFY_MAX_CHART_BYTES`
 - `DANCIFY_MAX_REPORT_BYTES`
-- `DANCIFY_MEDIA_DURATION_TOLERANCE` (seconds; default `0.25`, with 2% floor)
+- `DANCIFY_MEDIA_DURATION_TOLERANCE` (seconds; default `0.25`; fixed rather than proportional to song length)
 - `DANCIFY_PIPELINE_PYTHON` (explicit pipeline interpreter; default
   `pipeline/.venv/bin/python`)
 - `DANCIFY_PREPARATION_WORKER_ENABLED=0` (disable the local worker, primarily
@@ -262,3 +262,30 @@ python backend/scripts/prepare_smoke.py \
 python backend/scripts/prepare_smoke.py \
   --url 'https://www.tiktok.com/@creator/video/123'
 ```
+
+
+## Web scoring compatibility
+
+Manual chart publication now requires the current `dance.report.json` alongside
+chart/audio. The report must assert audio-derived timing, stable tracking and
+aspect-aware image-landmark normalization, and match the chart's beat grid/BPM
+and the reference video's aspect ratio. Rejected uploads preserve the previous
+bundle. Reports carry `cache.verification=manual_report` for manual uploads or
+`local_preparation` for output produced by the local worker. A manual assertion
+is not proof that its chart/audio content came from the reference video.
+
+Legacy songs/files and play history are preserved. The web loader rejects legacy
+bundles without current normalization metadata and offers regeneration. The
+frozen chart schema stays at version 1.0; compatibility metadata is in the report.
+
+`POST /songs/{id}/plays` accepts these optional fields:
+
+- `client_session_id`: UUID; retrying an identical result returns the existing play.
+  Reusing it with different data returns HTTP 409.
+- `mode`: `camera` (default) or `keyboard_practice`.
+- `tracking_coverage`: fraction of checkpoints with valid comparisons, or null.
+
+SQLite adds nullable session/coverage fields and a default camera mode without
+removing prior rows. Clients should always send the pinned `bundle_id` and a
+stable session ID for retries. The worker preserves the configured venv Python
+path instead of resolving it to the base interpreter.

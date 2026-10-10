@@ -25,7 +25,7 @@ pipeline features.
 See `PRD.md.md` for the product vision and roadmap, and `AGENTS.md.md` for
 ownership and repository rules. The pipeline needs Python 3.10+, FFmpeg, and
 `librosa`/`mediapipe`. The song-cache API needs Python 3.10+
-(`backend/requirements.txt`). The planned game needs Node 18+; the planned
+(`backend/requirements.txt`). The web game needs Node 22.12+ (see `web/README.md`); the planned
 firmware needs the Arduino IDE with the ESP32 board package.
 
 **Backend note:** We intentionally run a small local API so songs and pipeline outputs can be stored once and reused (saves compute) and so play history sticks to each song. Stack: **FastAPI + SQLite + files under `backend/data/`**. No user auth. Details in `backend/README.md` and `PRD.md.md` §7.
@@ -34,7 +34,8 @@ firmware needs the Arduino IDE with the ESP32 board package.
 
 Pipeline: `python pipeline/main.py --input <video> --output dance.json`
 Backend: `cd backend && uvicorn app.main:app --reload --port 8000`
-Game and firmware: not yet scaffolded in this repository.
+Game: `cd web && npm ci && npm run dev` (local backend required; see `web/README.md`).
+Firmware: not yet scaffolded in this repository.
 
 ## Documentation
 

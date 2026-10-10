@@ -89,6 +89,9 @@ class SongOut(BaseModel):
 
 
 class PlayCreate(StrictModel):
+    client_session_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+    mode: Literal["camera", "keyboard_practice"] = "camera"
+    tracking_coverage: float | None = Field(default=None, ge=0, le=1)
     player_name: str = Field(default="anonymous", max_length=128)
     score: int = Field(default=0, ge=0)
     accuracy: float | None = Field(default=None, ge=0, le=1)
@@ -104,6 +107,9 @@ class PlayCreate(StrictModel):
 
 
 class PlayOut(BaseModel):
+    client_session_id: str | None
+    mode: str
+    tracking_coverage: float | None
     id: str
     song_id: str
     bundle_id: str | None

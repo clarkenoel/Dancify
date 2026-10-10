@@ -35,6 +35,7 @@ def isolated_database(
             "video_codec": "h264",
             "audio_codec": "aac",
             "duration": 4.0,
+            "aspect_ratio": 1.0,
         },
     )
     yield

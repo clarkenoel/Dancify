@@ -16,10 +16,7 @@ from .chart_validation import validate_chart
 from .media import validate_bundle_media
 from .models import PreparationJob, Song, utcnow
 from .paths import resolve_stored_path, song_dir, stored_path
-
-
-class ReportValidationError(ValueError):
-    pass
+from .report_validation import ReportValidationError, validate_report
 
 
 @dataclass(frozen=True)
@@ -71,11 +68,14 @@ def publish_bundle(
     """Validate and publish one whole generation, then switch DB pointers once."""
     chart = validate_chart(chart_bytes)
     report = _load_report(report_bytes)
+    validate_report(report, chart)
     media = validate_bundle_media(
         video_path,
         audio_path,
         float(chart["duration"]),
     )
+    if abs(report["normalization"]["aspect_ratio"] - media["aspect_ratio"]) > 0.0001:
+        raise ReportValidationError("Report aspect ratio does not match the reference video")
 
     bundle_id = str(uuid.uuid4())
     folder = song_dir(song.id)
@@ -91,6 +91,7 @@ def publish_bundle(
             "song_id": song.id,
             "preparation_job_id": preparation_job.id if preparation_job else None,
             "source_kind": preparation_job.source_kind if preparation_job else "manual",
+            "verification": "local_preparation" if preparation_job else "manual_report",
             "published_at": utcnow().isoformat(),
             "media": media,
         }

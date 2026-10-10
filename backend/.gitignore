@@ -1,4 +1,5 @@
 .venv/
+data/web-development/
 __pycache__/
 *.pyc
 .pytest_cache/

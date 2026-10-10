@@ -46,9 +46,11 @@ def worker_enabled() -> bool:
 
 
 def _pipeline_python() -> Path:
+    # Resolving a venv's python symlink invokes the base interpreter and loses
+    # its site-packages. Preserve the configured executable path.
     return Path(
         os.environ.get("DANCIFY_PIPELINE_PYTHON", str(DEFAULT_PIPELINE_PYTHON))
-    ).resolve()
+    ).expanduser().absolute()
 
 
 def recover_interrupted_jobs() -> int:

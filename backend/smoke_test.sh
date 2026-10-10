@@ -67,7 +67,20 @@ open(sys.argv[1], "w").write(json.dumps(chart))
 PY
 ffmpeg -nostdin -loglevel error -y -i "$TMP/video.mp4" \
   -map 0:a:0 -c:a pcm_s16le "$TMP/audio.wav"
-printf '{"version":"1.0","status":"ready","smoke":true}\n' > "$TMP/dance.report.json"
+# This is an explicit API fixture, not a claim that the generated black video
+# was processed by MediaPipe. Publication labels its provenance manual_report.
+python3 - "$CHART" "$TMP/dance.report.json" <<'PYREPORT'
+import json,sys
+chart=json.load(open(sys.argv[1]))
+report={
+  "version":"1.0", "smoke":True,
+  "normalization":{"coordinate_space":"mediapipe_image","aspect_ratio":160/90,"x_z_scaled_by_aspect_ratio":True},
+  "readiness":{"cache_ready_by_default":True,"synthetic_timing":False,"solo_cfr_mvp":True},
+  "timing":{"source":"audio","synthetic":False,"bpm":chart["bpm"],"beat_times":chart["beat_times"]},
+  "tracking":{"valid_frames":40,"total_frames":40,"valid_frame_ratio":1.0,"longest_invalid_seconds":0.0,"trailing_invalid_seconds":0.0}
+}
+json.dump(report,open(sys.argv[2],"w"))
+PYREPORT
 
 READY=$(curl -sf -X PUT "$BASE/songs/$ID/chart" \
   -F "chart=@$CHART" \
