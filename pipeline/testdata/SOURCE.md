@@ -8,7 +8,7 @@
 
 ## Real TikTok used for smoke (2026-10-10 ~10:29 UTC)
 
-- URL: https://www.tiktok.com/@official_kep1er/video/7225090219391896834  
+- URL: https://www.tiktok.com/@official_kep1er/video/7225090219391896834
 - Title context: Kep1er — **Giddy Isolation Dance** (`#Giddychallenge`)
 - Duration: **~10.1s**, **1080×1920**, AAC audio
 - Framing: **one dancer visible per frame** (isolation-style cuts between members — not a multi-person simultaneous shot)
