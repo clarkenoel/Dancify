@@ -251,3 +251,14 @@ python -m compileall -q app
 The pytest suite uses an isolated temporary SQLite database and media directory.
 The worker is disabled in tests. `smoke_test.sh` uses FFmpeg-generated valid
 media and remains the end-to-end check against a running localhost server.
+
+For a real preparation smoke against a running worker:
+
+```bash
+python backend/scripts/prepare_smoke.py \
+  --video /path/to/local-video-with-music.mp4
+
+# Environment-dependent URL path; may return download_failed.
+python backend/scripts/prepare_smoke.py \
+  --url 'https://www.tiktok.com/@creator/video/123'
+```
