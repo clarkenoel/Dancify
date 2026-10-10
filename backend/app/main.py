@@ -8,6 +8,7 @@ import logging
 import os
 import shutil
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
@@ -19,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .chart_validation import ChartValidationError, validate_chart
-from .db import get_db, init_db
+from .db import SessionLocal, get_db, init_db
 from .models import Play, Song, utcnow
 from .paths import (
     SONGS_DIR,
@@ -59,10 +60,50 @@ CORS_ORIGINS = tuple(
 
 _song_locks: dict[str, asyncio.Lock] = {}
 
+
+def _lock_for(song_id: str) -> asyncio.Lock:
+    return _song_locks.setdefault(song_id, asyncio.Lock())
+
+
+def _cleanup_tombstones() -> None:
+    with SessionLocal() as db:
+        for tombstone in SONGS_DIR.glob(".deleted-*"):
+            song_id = tombstone.name.removeprefix(".deleted-")[:36]
+            try:
+                uuid.UUID(song_id)
+            except ValueError:
+                logger.error("Preserving unrecognized deletion tombstone %s", tombstone)
+                continue
+
+            song_exists = db.get(Song, song_id) is not None
+            folder = song_dir(song_id, create=False)
+            try:
+                if song_exists and not folder.exists():
+                    os.replace(tombstone, folder)
+                    logger.warning("Restored interrupted song deletion for %s", song_id)
+                elif not song_exists:
+                    remove_path(tombstone)
+                else:
+                    logger.error(
+                        "Preserving conflicting deletion tombstone %s", tombstone
+                    )
+            except OSError:
+                logger.exception("Could not reconcile deletion tombstone %s", tombstone)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    ensure_data_dirs()
+    init_db()
+    _cleanup_tombstones()
+    yield
+
+
 app = FastAPI(
     title="Dancify Song Cache",
     description="Local no-auth store for playable song bundles and play history.",
     version="0.2.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -72,25 +113,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Accept", "Content-Type"],
 )
-
-
-def _lock_for(song_id: str) -> asyncio.Lock:
-    return _song_locks.setdefault(song_id, asyncio.Lock())
-
-
-def _cleanup_tombstones() -> None:
-    for tombstone in SONGS_DIR.glob(".deleted-*"):
-        try:
-            remove_path(tombstone)
-        except OSError:
-            logger.exception("Could not remove deletion tombstone %s", tombstone)
-
-
-@app.on_event("startup")
-def on_startup() -> None:
-    ensure_data_dirs()
-    init_db()
-    _cleanup_tombstones()
 
 
 def _get_song(db: Session, song_id: str) -> Song:
@@ -339,14 +361,20 @@ async def update_song(
             song.title = data["title"]
         if "source_url" in data:
             song.source_url = data["source_url"]
-        if "error_message" in data:
+        if "error_message" in data and not source_changed:
             song.error_message = data["error_message"]
         if "status" in data and not source_changed:
-            if data["status"] == "ready" and not _ready_bundle_complete(song):
-                raise HTTPException(
-                    status_code=409,
-                    detail="ready requires reference video, valid chart, and audio",
-                )
+            if data["status"] == "ready":
+                if song.status != "ready":
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Only chart/audio upload can transition to ready",
+                    )
+                if not _ready_bundle_complete(song):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="ready requires reference video, valid chart, and audio",
+                    )
             song.status = data["status"]
             if song.status == "ready":
                 song.error_message = None

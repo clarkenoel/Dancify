@@ -84,6 +84,8 @@ def ready_song(client: TestClient) -> dict[str, object]:
             **chart(),
             "moves": [{**chart()["moves"][0], "end": 9.0}],  # type: ignore[index]
         },
+        {**chart(), "beat_times": []},
+        {**chart(), "moves": []},
     ],
 )
 def test_invalid_chart_never_overwrites_ready_cache(
@@ -145,6 +147,24 @@ def test_ready_requires_reference_video_chart_and_audio(client: TestClient) -> N
     assert ready.json()["has_audio"] is True
 
 
+def test_extreme_numeric_literal_is_invalid_chart(client: TestClient) -> None:
+    song = create_song(client)
+    huge_number = b"9" * 5000
+    raw = (
+        b'{"version":"1.0","bpm":'
+        + huge_number
+        + b',"beat_times":[0.5],"duration":4,"moves":[]}'
+    )
+    response = client.put(
+        f"/songs/{song['id']}/chart",
+        files={
+            "chart": ("dance.json", raw, "application/json"),
+            "audio": ("audio.wav", AUDIO, "audio/wav"),
+        },
+    )
+    assert response.status_code == 400
+
+
 def test_source_and_video_replacements_invalidate_derived_data(
     client: TestClient,
 ) -> None:
@@ -155,7 +175,10 @@ def test_source_and_video_replacements_invalidate_derived_data(
 
     changed_source = client.patch(
         f"/songs/{song_id}",
-        json={"source_url": "https://example.test/replacement"},
+        json={
+            "source_url": "https://example.test/replacement",
+            "error_message": "stale error",
+        },
     )
     assert changed_source.status_code == 200
     assert changed_source.json()["status"] == "pending"
@@ -163,6 +186,7 @@ def test_source_and_video_replacements_invalidate_derived_data(
     assert changed_source.json()["has_chart"] is False
     assert changed_source.json()["has_audio"] is False
     assert changed_source.json()["bpm"] is None
+    assert changed_source.json()["error_message"] is None
     assert not list(folder.glob("bundle-*"))
 
     client.post(
@@ -288,6 +312,30 @@ def test_failed_bundle_commit_rolls_back_to_previous_generation(
     assert len(list(folder.glob("bundle-*"))) == 1
 
 
+def test_failed_video_commit_preserves_previous_ready_bundle(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    song = ready_song(client)
+    song_id = str(song["id"])
+    old_video = client.get(f"/songs/{song_id}/video").content
+    old_chart = client.get(f"/songs/{song_id}/chart").content
+
+    def fail_commit(_: Session) -> None:
+        raise RuntimeError("simulated commit failure")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Session, "commit", fail_commit)
+        response = client.post(
+            f"/songs/{song_id}/video",
+            files={"video": ("replacement.mp4", b"replacement-video", "video/mp4")},
+        )
+
+    assert response.status_code == 500
+    assert client.get(f"/songs/{song_id}/video").content == old_video
+    assert client.get(f"/songs/{song_id}/chart").content == old_chart
+    assert client.get(f"/songs/{song_id}").json()["status"] == "ready"
+
+
 def test_upload_limits_reject_before_replacing_cache(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -318,6 +366,27 @@ def test_create_and_update_normalize_input(client: TestClient) -> None:
         data={"title": "x" * 257, "source_url": "https://example.test/video"},
     )
     assert too_long.status_code == 422
+
+    for source_url in ("not a url", "ftp://example.test/video"):
+        invalid_url = client.post(
+            "/songs/json",
+            json={"title": "Bad URL", "source_url": source_url},
+        )
+        assert invalid_url.status_code == 422
+
+
+def test_startup_reconciles_interrupted_deletion(client: TestClient) -> None:
+    song = create_song(client)
+    song_id = str(song["id"])
+    folder = SONGS_DIR / song_id
+    tombstone = SONGS_DIR / f".deleted-{song_id}-simulated"
+    folder.rename(tombstone)
+
+    main._cleanup_tombstones()
+
+    assert folder.exists()
+    assert not tombstone.exists()
+    assert client.get(f"/songs/{song_id}/video").status_code == 200
 
 
 def test_delete_removes_song_directory(client: TestClient) -> None:

@@ -22,7 +22,8 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 - Media: `backend/data/songs/<id>/`
 
 Keep this no-auth service bound to localhost. It is a local hackathon companion,
-not a LAN or public API.
+not a LAN or public API. Run one Uvicorn worker; per-song mutation locks are
+process-local.
 
 ## Cache invariants
 
@@ -120,6 +121,8 @@ Defaults are safe for a local Vite demo:
 - Maximum audio: 100 MiB
 - Maximum chart: 20 MiB
 
+`source_url` must be an absolute `http://` or `https://` URL.
+
 Optional environment variables:
 
 - `DANCIFY_DATA_DIR`
@@ -137,7 +140,7 @@ continue to resolve.
 ```bash
 cd backend
 pip install -r requirements.txt -r requirements-dev.txt
-pytest -q
+python -m pytest -q
 python -m compileall -q app
 ```
 

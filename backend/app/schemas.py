@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -12,9 +13,23 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+def _http_url(value: str | None) -> str | None:
+    if value is None:
+        return None
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("source_url must be an absolute HTTP(S) URL")
+    return value
+
+
 class SongCreate(StrictModel):
     title: str = Field(..., min_length=1, max_length=256)
     source_url: str | None = Field(default=None, min_length=1, max_length=1024)
+
+    @field_validator("source_url", mode="after")
+    @classmethod
+    def validate_source_url(cls, value: str | None) -> str | None:
+        return _http_url(value)
 
 
 class SongUpdate(StrictModel):
@@ -22,6 +37,11 @@ class SongUpdate(StrictModel):
     source_url: str | None = Field(default=None, min_length=1, max_length=1024)
     status: SongStatus | None = None
     error_message: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("source_url", mode="after")
+    @classmethod
+    def validate_source_url(cls, value: str | None) -> str | None:
+        return _http_url(value)
 
     @model_validator(mode="after")
     def reject_null_required_fields(self) -> "SongUpdate":

@@ -23,7 +23,10 @@ def _validator() -> Draft7Validator:
 
 
 def _finite_number(value: Any, field: str) -> float:
-    number = float(value)
+    try:
+        number = float(value)
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise ChartValidationError(f"{field} must be a finite number") from exc
     if not math.isfinite(number):
         raise ChartValidationError(f"{field} must be finite")
     return number
@@ -32,10 +35,13 @@ def _finite_number(value: Any, field: str) -> float:
 def validate_chart(raw: bytes) -> dict[str, Any]:
     try:
         payload = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         raise ChartValidationError(f"Invalid JSON: {exc}") from exc
 
-    errors = sorted(_validator().iter_errors(payload), key=lambda error: list(error.path))
+    errors = sorted(
+        _validator().iter_errors(payload),
+        key=lambda error: tuple(str(part) for part in error.path),
+    )
     if errors:
         error = errors[0]
         location = ".".join(str(part) for part in error.absolute_path) or "chart"
@@ -47,6 +53,10 @@ def validate_chart(raw: bytes) -> dict[str, Any]:
         raise ChartValidationError("duration must be greater than zero")
     if bpm <= 0:
         raise ChartValidationError("bpm must be greater than zero")
+    if not payload["beat_times"]:
+        raise ChartValidationError("beat_times must contain at least one beat")
+    if not payload["moves"]:
+        raise ChartValidationError("moves must contain at least one move")
 
     previous_beat = -1.0
     for index, beat in enumerate(payload["beat_times"]):
