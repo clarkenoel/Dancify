@@ -66,11 +66,19 @@ def main() -> int:
         ax.axvline(b, color="#cccccc", lw=0.6, zorder=0)
     for h in hits:
         ax.axvline(h, color="#c0392b", lw=1.2, alpha=0.85)
-    ax.scatter(hits, np.interp(hits, times, energy), color="#c0392b", s=36, zorder=5, label="hits")
+    # Red markers at musical hit times (on beat/half-beat after valley snap)
+    ax.scatter(
+        hits,
+        np.interp(hits, times, energy),
+        color="#c0392b",
+        s=40,
+        zorder=5,
+        label="hits (valley→beat)",
+    )
     ax.set_ylabel("energy")
     ax.set_title(
         f"Velocity curve — bpm={result['bpm']:.1f} moves={result['move_count']} "
-        "(gray=beats, red=musical hits ~2 beats)"
+        "(gray=beats, red=JD-style valley snaps)"
     )
     ax.legend(loc="upper right")
 

@@ -40,10 +40,12 @@ def run_pipeline(
     normalized = normalize_sequence(smoothed)
 
     energy = motion_energy(normalized, times)
-    hits = select_musical_hits(
+    hits, key_idxs = select_musical_hits(
         energy, times, beat_times, duration, bpm, target_beats_per_hit=2.0
     )
-    moves = build_moves(hits, normalized, times, duration)
+    moves = build_moves(
+        hits, normalized, times, duration, keyframe_indices=key_idxs
+    )
 
     doc: dict[str, Any] = {
         "version": "1.0",

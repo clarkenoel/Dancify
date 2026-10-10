@@ -49,9 +49,9 @@ See [`testdata/SOURCE.md`](testdata/SOURCE.md). YouTube/TikTok downloads were bo
 - **Person B start here:** [`WEB_HANDOFF.md`](WEB_HANDOFF.md) — how to `GET /songs/{id}/chart` + `/audio`, post plays, and match landmark space.
 - Audio is a **sidecar WAV** (schema has no audio field). Backend: `GET /songs/{id}/audio`.
 
-## Hit density
+## Hit density (Just Dance calibration)
 
-Hits are chosen **on whole beats** (~every **2 beats** by default) by scoring energy valleys near the beat grid — not “every local dip.” Gate with the velocity plot before handing charts to web.
+Valley-first: find motion-energy dips, snap to beat/half-beat if close, thin to ~every **2 beats**. See [`CALIBRATION.md`](CALIBRATION.md). Gate with the velocity plot (red = hit on beat at a valley) before handing charts to web.
 
 ## Layout
 
