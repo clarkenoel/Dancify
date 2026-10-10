@@ -40,6 +40,13 @@ jobs:
             backend/requirements.txt
             pipeline/requirements.txt
 
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
       - name: Install isolated backend and pipeline environments
         run: |
           python -m venv backend/.venv
