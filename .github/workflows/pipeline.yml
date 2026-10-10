@@ -28,6 +28,11 @@ jobs:
         working-directory: pipeline
 
     steps:
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg
+
       - name: Checkout pipeline sources without media fixtures
         uses: actions/checkout@v4
         with:
