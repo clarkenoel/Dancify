@@ -84,11 +84,25 @@ temporary and are not committed.
 
 ```bash
 python debug/velocity.py testdata/sample.mp4 --out debug_out/velocity.png
+python debug/tracking_video.py testdata/sample.mp4 \
+  --out debug_out/tracking.mp4 \
+  --json-out debug_out/dance.json
 ```
 
 Gray lines = beats, red = snapped hits, orange × = selected valley frames, and
 shading = invalid tracking. A chart is not demo-ready if tracking gaps dominate,
 orange valleys are implausible, or synthetic timing has not been reviewed.
+
+Tracking diagnostics are written before continuity rejection:
+
+- `dance.tracking.json` — exact invalid frame/time ranges and frame-level reasons
+- `dance.tracking.mp4` — original footage with detected skeleton, confidence,
+  and validation reason (generated automatically on tracking failure)
+- `_work/debug_arrays.npz` — raw/interpolated/smoothed arrays and masks
+
+Short bounded gaps (about 100ms) may be interpolated. Long gaps are never filled
+with invented poses. They produce no checkpoints and can make footage
+unsupported when the continuity gate fails.
 
 ## Smoke clip
 

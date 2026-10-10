@@ -26,6 +26,8 @@ def test_mandatory_demo_uses_canonical_tracked_assets() -> None:
         bake.ROOT / "pipeline/testdata/audio_1.m4a"
     )
     assert bake.MANDATORY.required is True
+    assert bake.MANDATORY.start_time == 0.0
+    assert bake.MANDATORY.end_time == 59.5
 
 
 def test_manifest_identity_wins_over_title_fallback() -> None:

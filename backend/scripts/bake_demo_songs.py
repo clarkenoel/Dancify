@@ -39,6 +39,8 @@ class DemoSpec:
     video: Path
     audio_sidecar: Path | None
     required: bool
+    start_time: float = 0.0
+    end_time: float | None = None
 
 
 MANDATORY = DemoSpec(
@@ -47,6 +49,7 @@ MANDATORY = DemoSpec(
     video=PIPELINE_ROOT / "testdata" / "Video_1.mp4",
     audio_sidecar=PIPELINE_ROOT / "testdata" / "audio_1.m4a",
     required=True,
+    end_time=59.5,
 )
 OPTIONAL = (
     DemoSpec(
@@ -144,17 +147,33 @@ def _duration(path: Path) -> float:
     return duration
 
 
-def _mux_video_master(video: Path, audio: Path, output: Path) -> float:
-    """Mux sidecar audio while keeping the tracked video's zero-based duration."""
-    duration = _duration(video)
+def _mux_video_master(
+    video: Path,
+    audio: Path,
+    output: Path,
+    *,
+    start_time: float = 0.0,
+    end_time: float | None = None,
+) -> float:
+    """Mux a selected playable range on a new zero-based video timeline."""
+    source_duration = _duration(video)
+    end = end_time if end_time is not None else source_duration
+    if start_time < 0 or end <= start_time or end > source_duration + 0.1:
+        raise RuntimeError("Demo range is outside the source timeline")
+    duration = min(end, source_duration) - start_time
     output.parent.mkdir(parents=True, exist_ok=True)
-    _run(
+    command = [
+        "ffmpeg",
+        "-nostdin",
+        "-y",
+    ]
+    if start_time > 0:
+        command.extend(["-ss", f"{start_time:.6f}"])
+    command.extend(["-i", str(video)])
+    if start_time > 0:
+        command.extend(["-ss", f"{start_time:.6f}"])
+    command.extend(
         [
-            "ffmpeg",
-            "-nostdin",
-            "-y",
-            "-i",
-            str(video),
             "-i",
             str(audio),
             "-map",
@@ -162,7 +181,13 @@ def _mux_video_master(video: Path, audio: Path, output: Path) -> float:
             "-map",
             "1:a:0",
             "-c:v",
-            "copy",
+            "libx264",
+            "-preset",
+            "medium",
+            "-crf",
+            "20",
+            "-pix_fmt",
+            "yuv420p",
             "-af",
             f"aresample=async=1:first_pts=0,apad,atrim=duration={duration:.6f}",
             "-c:a",
@@ -176,7 +201,10 @@ def _mux_video_master(video: Path, audio: Path, output: Path) -> float:
             "-avoid_negative_ts",
             "make_zero",
             str(output),
-        ],
+        ]
+    )
+    _run(
+        command,
         label="video/audio mux",
     )
     probe = _probe(output)
@@ -505,6 +533,8 @@ def _seed_demo(
             spec.video,
             spec.audio_sidecar,
             reference_video,
+            start_time=spec.start_time,
+            end_time=spec.end_time,
         )
 
     chart, extracted_audio, report = _run_pipeline(
@@ -552,6 +582,10 @@ def _seed_demo(
             else "embedded"
         ),
         "video_master_duration": round(video_master_duration, 6),
+        "source_range": {
+            "start": spec.start_time,
+            "end": spec.end_time,
+        },
         "bpm": ready.get("bpm"),
         "duration": ready.get("duration"),
         "move_count": ready.get("move_count"),
