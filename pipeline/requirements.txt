@@ -8,3 +8,4 @@ matplotlib==3.9.3
 jsonschema==4.23.0
 requests==2.32.3
 yt-dlp>=2024.12.23
+curl_cffi>=0.7.0

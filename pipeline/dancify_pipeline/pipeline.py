@@ -10,7 +10,7 @@ import numpy as np
 from .audio import extract_audio
 from .beats import track_beats
 from .energy import motion_energy
-from .hits import build_moves, find_energy_dips, snap_to_beats
+from .hits import build_moves, select_musical_hits
 from .ingest import resolve_input, video_duration_seconds
 from .normalize import normalize_sequence
 from .pose import extract_poses
@@ -40,16 +40,9 @@ def run_pipeline(
     normalized = normalize_sequence(smoothed)
 
     energy = motion_energy(normalized, times)
-    dips = find_energy_dips(energy, times)
-    hits = snap_to_beats(dips, beat_times, half_beats=True)
-    # ensure at least a few hits for short clips
-    if hits.size == 0 and beat_times:
-        # fallback: every other beat in the middle of the clip
-        mid = [t for t in beat_times if 0.5 < t < duration - 0.3]
-        hits = snap_to_beats(
-            np.asarray(mid[::2], dtype=float), beat_times, half_beats=False
-        )
-
+    hits = select_musical_hits(
+        energy, times, beat_times, duration, bpm, target_beats_per_hit=2.0
+    )
     moves = build_moves(hits, normalized, times, duration)
 
     doc: dict[str, Any] = {

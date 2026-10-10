@@ -1,12 +1,16 @@
-"""Try to fetch a ≤20s single-dancer Short; fall back to Mixkit+music assembly."""
+"""Fetch a ≤20s single-dancer Short/TikTok; fall back to Mixkit+music assembly."""
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-PRIMARY_URL = "https://www.youtube.com/watch?v=HKRlrJNT6EQ"
+PRIMARY_YT = "https://www.youtube.com/watch?v=HKRlrJNT6EQ"
+TIKTOK_FALLBACK = (
+    "https://www.tiktok.com/@official_kep1er/video/7225090219391896834"
+)
 MIXKIT_DANCE = "https://assets.mixkit.co/videos/4823/4823-720.mp4"
 MUSIC_URL = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
 
@@ -14,9 +18,9 @@ ROOT = Path(__file__).resolve().parents[1]
 TESTDATA = ROOT / "testdata"
 
 
-def try_ytdlp(url: str, dest: Path) -> Path | None:
+def try_ytdlp(url: str, dest: Path, *, impersonate: bool = False) -> Path | None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    out = dest.with_suffix("") 
+    out = dest.with_suffix("")
     cmd = [
         "yt-dlp",
         "-f",
@@ -25,18 +29,26 @@ def try_ytdlp(url: str, dest: Path) -> Path | None:
         "mp4",
         "-o",
         str(out) + ".%(ext)s",
-        url,
     ]
+    if impersonate:
+        cmd += ["--impersonate", "chrome"]
+    cmd.append(url)
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
-        print(proc.stderr[-1500:], file=sys.stderr)
+        print(proc.stderr[-1200:], file=sys.stderr)
         return None
     found = list(dest.parent.glob(out.name + ".*"))
     videos = [p for p in found if p.suffix.lower() in {".mp4", ".webm", ".mkv"}]
-    return videos[0] if videos else None
+    if not videos:
+        return None
+    # Normalize name to sample.mp4
+    chosen = videos[0]
+    if chosen.resolve() != dest.resolve():
+        shutil.move(str(chosen), str(dest))
+    return dest
 
 
-def assemble_fallback(dest: Path) -> Path:
+def assemble_mixkit(dest: Path) -> Path:
     import urllib.request
 
     TESTDATA.mkdir(parents=True, exist_ok=True)
@@ -77,13 +89,16 @@ def assemble_fallback(dest: Path) -> Path:
 
 def main() -> int:
     dest = TESTDATA / "sample.mp4"
-    print(f"Trying primary Short: {PRIMARY_URL}")
-    got = try_ytdlp(PRIMARY_URL, dest)
-    if got:
-        print(f"Downloaded {got}")
+    print(f"1) YouTube Short: {PRIMARY_YT}")
+    if try_ytdlp(PRIMARY_YT, dest):
+        print(f"Downloaded {dest}")
         return 0
-    print("Primary blocked; assembling Shorts-format Mixkit dancer + music fallback")
-    path = assemble_fallback(dest)
+    print(f"2) TikTok dance (impersonate chrome): {TIKTOK_FALLBACK}")
+    if try_ytdlp(TIKTOK_FALLBACK, dest, impersonate=True):
+        print(f"Downloaded {dest}")
+        return 0
+    print("3) Mixkit dancer + music assemble (last resort)")
+    path = assemble_mixkit(dest)
     print(f"Wrote {path}")
     return 0
 

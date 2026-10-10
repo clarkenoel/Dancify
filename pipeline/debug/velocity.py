@@ -70,7 +70,7 @@ def main() -> int:
     ax.set_ylabel("energy")
     ax.set_title(
         f"Velocity curve — bpm={result['bpm']:.1f} moves={result['move_count']} "
-        "(gray=beats, red=hits)"
+        "(gray=beats, red=musical hits ~2 beats)"
     )
     ax.legend(loc="upper right")
 

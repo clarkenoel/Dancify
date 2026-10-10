@@ -42,11 +42,16 @@ Gray lines = beats, red = hits. If red markers don’t sit in energy dips on the
 
 See [`testdata/SOURCE.md`](testdata/SOURCE.md). YouTube/TikTok downloads were bot-blocked in the build environment; the checked local sample is a ≤20s portrait single-dancer clip with music (Shorts-shaped). `*.mp4` is gitignored — rebuild notes are in SOURCE.md.
 
-## Contracts
+## Contracts / web handoff
 
 - Schema file on disk: `../schema/dance.schema.json.json` (double extension).
 - Normalization: [`NORMALIZATION.md`](NORMALIZATION.md).
+- **Person B start here:** [`WEB_HANDOFF.md`](WEB_HANDOFF.md) — how to `GET /songs/{id}/chart` + `/audio`, post plays, and match landmark space.
 - Audio is a **sidecar WAV** (schema has no audio field). Backend: `GET /songs/{id}/audio`.
+
+## Hit density
+
+Hits are chosen **on whole beats** (~every **2 beats** by default) by scoring energy valleys near the beat grid — not “every local dip.” Gate with the velocity plot before handing charts to web.
 
 ## Layout
 

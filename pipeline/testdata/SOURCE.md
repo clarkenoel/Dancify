@@ -1,17 +1,26 @@
 # Smoke-test clip provenance
 
-## Intended primary
-- URL: https://www.youtube.com/watch?v=HKRlrJNT6EQ
-- Title: BTS / Jimin — Permission to Dance challenge Short (15s)
-- Result: **Blocked** in this cloud environment (`Sign in to confirm you're not a bot`). TikTok URLs also failed (impersonation / unexpected response). Cobalt/Invidious/ytdl-core likewise blocked.
+## Primary attempt (YouTube Short) — still blocked
 
-## Fallback used (meets use-case bar)
-- **Video:** Mixkit stock #4823 — single woman dancing outdoors, full body, clear choreography (~10.3s).
-  - Source: `https://assets.mixkit.co/videos/4823/4823-720.mp4`
-  - Mixkit listing context: free-stock-video/dance/
-- **Audio:** SoundHelix Song 1 (instrumental with clear beat), muxed for “dancing to a song” beat tracking.
-  - Source: `https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3`
-- **Assembly:** cropped/scaled to **720×1280** (Shorts/TikTok aspect), ≤20s, H.264 + AAC → `sample.mp4`
-- **Why valid for Dancify:** ≤20s, **one dancer** in frame, **dancing to music**, portrait short-form — same ingest shape as a TikTok/YouTube Short.
+- URL: https://www.youtube.com/watch?v=HKRlrJNT6EQ (Permission to Dance challenge Short)
+- Retries: 2026-10-10 AM + ~10:25 UTC with latest `yt-dlp`, Deno, android/web clients.
+- Result: **Bot check** (`Sign in to confirm you're not a bot` / 403). Needs `--cookies-from-browser` on a real laptop session.
 
-Do not commit `sample.mp4` (gitignored). Re-fetch with `python -m dancify_pipeline.fetch_sample` or the commands in README.
+## Real TikTok used for smoke (2026-10-10 ~10:29 UTC)
+
+- URL: https://www.tiktok.com/@official_kep1er/video/7225090219391896834  
+- Title context: Kep1er — **Giddy Isolation Dance** (`#Giddychallenge`)
+- Duration: **~10.1s**, **1080×1920**, AAC audio
+- Framing: **one dancer visible per frame** (isolation-style cuts between members — not a multi-person simultaneous shot)
+- Download that worked in cloud:
+
+```bash
+yt-dlp --impersonate chrome -f "b" -o pipeline/testdata/sample.mp4 \
+  'https://www.tiktok.com/@official_kep1er/video/7225090219391896834'
+```
+
+## Offline fallback (if TikTok/YT both fail)
+
+Mixkit #4823 dancer + SoundHelix music → Shorts-format assemble via `python -m dancify_pipeline.fetch_sample`.
+
+Do **not** commit `sample.mp4` (gitignored).

@@ -1,5 +1,7 @@
 # Landmark normalization handshake (Person A ↔ Person B)
 
+Also read [`WEB_HANDOFF.md`](WEB_HANDOFF.md) for how to load cached charts from the song-cache API.
+
 Chart `keyframe_landmarks` are **not** raw MediaPipe image coordinates.
 
 For each frame / keyframe:
