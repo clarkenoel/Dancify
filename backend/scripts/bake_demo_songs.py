@@ -597,6 +597,7 @@ def _arguments(argv: list[str] | None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _arguments(argv)
     base_url = args.base_url.rstrip("/")
+    pipeline_python = args.pipeline_python.absolute()
     results: dict[str, Any] = {
         "version": "1.0",
         "status": "running",
@@ -606,7 +607,7 @@ def main(argv: list[str] | None = None) -> int:
         "optional": [],
     }
     try:
-        _preflight(args.pipeline_python)
+        _preflight(pipeline_python)
         health = _json_request("GET", f"{base_url}/health")
         if not isinstance(health, dict) or health.get("ok") is not True:
             raise RuntimeError(f"Backend is not healthy at {base_url}: {health}")
@@ -622,7 +623,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             mandatory = _seed_demo(
                 base_url,
-                args.pipeline_python.resolve(),
+                pipeline_python,
                 MANDATORY,
                 work_root,
                 previous_manifest,
@@ -642,7 +643,7 @@ def main(argv: list[str] | None = None) -> int:
                     optional_entries.append(
                         _seed_demo(
                             base_url,
-                            args.pipeline_python.resolve(),
+                            pipeline_python,
                             spec,
                             work_root,
                             previous_manifest,
