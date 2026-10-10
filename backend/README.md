@@ -38,6 +38,10 @@ The request requires both `chart` and `audio`, validates and stages both first,
 then atomically promotes the generation. A rejected or failed replacement leaves
 the previous ready bundle unchanged.
 
+Every move target must also contain a usable normalized pose: finite landmarks,
+at least six gameplay joints at visibility `>= 0.35`, and nonzero visible pose
+geometry. All-zero and low-visibility targets are rejected with HTTP 422.
+
 Replacing the reference video, or changing/clearing `source_url`, resets the song
 to `pending` and clears its chart, audio, BPM, duration, move count, error, and
 processed timestamp. A manual `PATCH status=ready` is rejected unless all three
