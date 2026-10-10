@@ -4,7 +4,7 @@ Tiny **no-auth** API for the hackathon: store songs/clips, cache pipeline `dance
 
 **Stack:** FastAPI + SQLite + files under `backend/data/`.
 
-> PRD said “no backend.” This is an intentional weekend override for clip storage and chart caching — not accounts, not cloud GPU.
+> Documented in `PRD.md` §7 / §8 / §14: local song cache is **in scope**. Still out of scope: user accounts, cloud DB/GPU, OAuth. This service is FastAPI + SQLite + disk files only.
 
 ## Run (plug and play)
 

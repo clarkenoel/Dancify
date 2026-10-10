@@ -173,6 +173,7 @@ All messages UTF-8 strings, newline-terminated optional.
     types.ts                ← FROZEN
     wearable.protocol.md    ← FROZEN
   pipeline/                 ← Person A only
+  backend/                  ← Person A (song/chart cache API; web consumes it)
   web/                      ← Person B only
   firmware/                 ← Person C only
   assets/pictograms/        ← Artist only
@@ -182,7 +183,7 @@ All messages UTF-8 strings, newline-terminated optional.
 **Ownership rules:**
 - Directory ownership is absolute.
 - Shared files (`package.json`, `index.html`, `.gitignore`) are integrator-only.
-- Never commit video or audio files. Use a shared Drive folder and reference paths in `.env`.
+- Never commit video or audio files into git. Store uploaded media under `backend/data/` (gitignored) or a shared Drive folder referenced in `.env`.
 - Branches live <4 hours. Rebase before every PR. Small PRs, merged often.
 
 ---
@@ -204,7 +205,11 @@ All messages UTF-8 strings, newline-terminated optional.
 - Arduino C++ (ESP32 board package)
 - `BLEDevice`, `LEDC` peripheral
 
-**No backend, no database, no server.** Static site. Host on Vercel or GitHub Pages.
+**Song cache API (`/backend`) — weekend override:**
+- **Why:** We need somewhere to hold user clips/dances, cache pipeline `dance.json` (+ audio) so we do not re-run MediaPipe/librosa on every play, and store per-song play history. Without this, every retry burns compute and demo prep is fragile.
+- **What:** Local **FastAPI** app + **SQLite** (`backend/data/dancify.db`) + files on disk under `backend/data/songs/<id>/`. **No auth**, no user accounts, no cloud DB, no cloud GPU.
+- **Run:** `cd backend && uvicorn app.main:app --reload --port 8000` (see `backend/README.md`).
+- The game remains a static Vite app; host the frontend on Vercel or GitHub Pages if desired. The API is a local/dev companion for the hackathon, not a production multi-tenant service.
 
 ---
 
@@ -213,7 +218,7 @@ All messages UTF-8 strings, newline-terminated optional.
 State explicitly so no one wastes time:
 
 - **No model training.** MediaPipe is pretrained. `librosa` is classic DSP. Motion energy is arithmetic. Pose comparison is trigonometry.
-- **No backend.** No FastAPI, no cloud GPU, no API keys.
+- **No cloud backend / no auth product.** Do not build user accounts, OAuth, cloud GPU inference, or paid API-key services. The **local** FastAPI + SQLite song cache in `/backend` is allowed and expected — it only stores songs, cached charts, and play history.
 - **No IMU.** The wearable doesn't score.
 - **No motion capture suit, no depth camera, no cloud inference.**
 - **No glowing hand overlay on the reference video.** The prep pipeline isolates the primary subject; there's only one dancer to follow.
@@ -227,7 +232,7 @@ If time allows, add a review step between download and analysis:
 - Advisory cut markers on the video timeline.
 - User selects a continuous range.
 - UI requires an explicit checkbox: "This range is one front-facing dancer in a single uninterrupted take."
-- Backend rejects analysis without `single_front_facing_take: true`.
+- The song-cache API (or pipeline CLI) rejects analysis without `single_front_facing_take: true`.
 
 This de-risks the pipeline by making the user responsible for choosing a clean input. **Build only if Phase 1 gates pass with time to spare.**
 
@@ -404,13 +409,15 @@ A demo is "done" when:
 
 Do not build:
 
-- User accounts, login, or persistence.
-- Leaderboards or online scoring.
-- A backend or database.
+- User accounts, login, or OAuth.
+- Leaderboards or online/multiplayer scoring.
+- Cloud databases, hosted auth, or cloud GPU inference APIs.
 - Video editing features.
 - A custom PCB or 3D-printed enclosure.
 - Additional scoring inputs beyond the webcam.
 - Any feature not in this PRD without team discussion.
+
+**In scope (clarification):** the local `/backend` song-cache API (FastAPI + SQLite + disk files, no auth) for clips, cached `dance.json`/audio, and play history — see §7.
 
 ---
 

@@ -4,9 +4,10 @@ You are working on the game frontend only. Person B owns this directory.
 
 ## Scope
 
-- TypeScript/React only. Do not touch `/pipeline`, `/firmware`, or `/schema`.
+- TypeScript/React only. Do not touch `/pipeline`, `/firmware`, `/backend`, or `/schema`.
 - `WearableClient.ts` is the only module that touches Web Bluetooth.
-- Read `dance.json` — never write it.
+- Read `dance.json` — never write it. Prefer loading cached charts from the local song-cache API (`http://127.0.0.1:8000`, see `backend/README.md` / `PRD.md` §7) when a song is `status=ready`.
+- You may **call** `/backend` HTTP endpoints; do not rewrite the backend. POST play results to `/songs/{id}/plays` after a run.
 
 ## Commands
 
