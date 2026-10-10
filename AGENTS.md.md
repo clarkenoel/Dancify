@@ -4,8 +4,9 @@ Read `PRD.md` (what to build), `TEAM.md` (ownership + git), and this file before
 
 ## Project
 
-Dancify turns any dance video into a playable rhythm game. Three parts:
+Dancify turns any dance video into a playable rhythm game. Four parts:
 - `/pipeline` — Python prep pipeline (video → `dance.json`)
+- `/backend` — Local FastAPI + SQLite song cache (clips, cached charts, play history; **no auth**)
 - `/web` — TypeScript/React game (plays `dance.json` with webcam scoring)
 - `/firmware` — ESP32 wearable (joystick + piezo, BLE, no scoring contribution)
 
@@ -20,7 +21,7 @@ Build order: vision first, hardware later. See `PRD.md` §3.
 5. Keyboard fallback must always work.
 6. The wearable never contributes to the score.
 7. Camera frames never leave the browser.
-8. No backend, no database, no cloud inference, no model training.
+8. No **cloud** backend, no auth/accounts, no cloud inference, no model training. The local `/backend` FastAPI + SQLite song cache **is allowed** (see `PRD.md` §7 and `backend/README.md`).
 9. The game loop never imports from `/firmware`.
 10. Never edit `/schema` without an explicit "unfreeze the schema" instruction.
 
@@ -29,6 +30,7 @@ Build order: vision first, hardware later. See `PRD.md` §3.
 | Directory | Owner | Rule |
 |---|---|---|
 | `/pipeline` | Person A | Edit only here |
+| `/backend` | Person A | Song/chart/play-history API; web may call it, not rewrite it |
 | `/web` | Person B | Edit only here |
 | `/firmware` | Person C | Edit only here |
 | `/assets/pictograms` | Person D | Edit only here |
