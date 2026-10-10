@@ -64,6 +64,22 @@ python main.py --input testdata/sample.mp4 --output outputs/dance.json --song-id
 Cache state validation is fail-fast. Synthetic-timing charts are marked failed
 instead of uploaded unless a human explicitly passes `--allow-synthetic-cache`.
 
+## Clean-checkout demo
+
+The end-to-end demo seed uses the tracked `testdata/Video_1.mp4` and
+`testdata/audio_1.m4a`, muxes them on the video master timeline, runs this
+pipeline with real audio, and uploads the complete bundle to the local backend:
+
+```bash
+# after creating backend/.venv and pipeline/.venv and starting the backend
+cd ..
+bash backend/scripts/bake_demo_songs.sh
+```
+
+See [`../backend/README.md`](../backend/README.md#reproducible-demo-seed-clean-checkout)
+for the complete fresh-checkout command. Generated media and charts are
+temporary and are not committed.
+
 ## Debug (required gate)
 
 ```bash

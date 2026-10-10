@@ -111,22 +111,50 @@ normally set only by the chart/audio upload endpoint.
 
 Pipeline tip: `PATCH` status to `processing` when you start, `PUT /chart` on success, or `PATCH` `status=failed` + `error_message` on failure.
 
-## Bake demo songs (no re-run)
+## Reproducible demo seed (clean checkout)
 
-After charts exist under `pipeline/outputs/`:
+The mandatory demo is built entirely from the tracked canonical assets:
+
+- `pipeline/testdata/Video_1.mp4`
+- `pipeline/testdata/audio_1.m4a`
+
+The seed command muxes the sidecar audio onto the video master timeline, runs
+the hardened pipeline with real audio, and uploads the reference video plus
+validated chart/audio. Generated mux, chart, report, and WAV files stay in a
+temporary directory and are not committed.
+
+From a clean checkout:
 
 ```bash
-# terminal A
-cd backend && source .venv/bin/activate
-uvicorn app.main:app --host 127.0.0.1 --port 8000
+python3 -m venv backend/.venv
+backend/.venv/bin/python -m pip install \
+  -r backend/requirements.txt -r backend/requirements-dev.txt
 
-# terminal B (repo root)
-python3 backend/scripts/bake_demo_songs.py
-# or: bash backend/scripts/bake_demo_songs.sh
+python3 -m venv pipeline/.venv
+pipeline/.venv/bin/python -m pip install -r pipeline/requirements-dev.txt
+
+# terminal A
+cd backend
+.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# terminal B, repository root
+bash backend/scripts/bake_demo_songs.sh
 ```
 
-Seeds **Charli LISA**, **Vegas solo**, and optional **JD Video_1** as `status=ready`.
-Manifest: `backend/data/demo_seed_manifest.json` (gitignored).
+Rerunning the command reuses the same song ID and preserves its play history.
+The previous ready bundle remains available while local generation runs and
+while a replacement chart/audio generation is staged.
+
+Optional local fixtures `pipeline/testdata/sample_a.mp4` and `sample_b.mp4` are
+seeded only when present; otherwise each is reported as an explicit skip.
+
+Atomic, gitignored outputs:
+
+- `backend/data/demo_seed_manifest.json` — stable song identity and URLs
+- `backend/data/demo_seed_results.json` — generation, skip, and GET verification
+
+Use `BASE_URL` for a non-default local port. Use `PIPELINE_PYTHON` if the
+pipeline environment is not at `pipeline/.venv/bin/python`.
 
 ## Env / config
 
