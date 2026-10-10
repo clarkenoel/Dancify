@@ -144,3 +144,14 @@ an ambiguous save retry, local MediaPipe inference and camera cleanup, real uplo
 preparation, and the provider-failure fallback UI. Only the download failure UI
 test mocks the API. Unit tests verify pose parity, invalid charts, lost tracking,
 pause/seek epochs, keyboard isolation, bundle pinning, and outbox recovery.
+
+## Temporary timing overlay
+
+The game shows a switchable overlay on the reference video. Beat diamonds cross
+NOW at the chart's `beat_times`; pose bars span the actual scoring windows. The
+current/next stick-figure pose, Enter/MATCH prompt, score, and combo remain visible
+on the video. Positions derive from the existing video-time snapshot, including
+pause, seek, and replay. Arrow keys still seek; this does not invent directional
+notes or exact hit timestamps. Use it to compare detected beats with the music.
+Native video fullscreen displays only the video; keep the player inline to show
+the overlay. Artwork and human timing calibration remain follow-up work.

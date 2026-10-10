@@ -3,11 +3,13 @@ import type { Bundle, Mode } from '../core/types';
 import { useGame } from '../hooks/useGame';
 import type { ResultOutbox } from '../core/outbox';
 import { PoseTarget } from './PoseTarget';
+import { TimingOverlay } from './TimingOverlay';
 
 export function GamePanel({ bundle, mode, outbox, onResult }: { bundle: Bundle; mode: Mode; outbox: ResultOutbox; onResult: () => void }) {
   const game = useGame(bundle, mode);
   const s = game.snapshot;
   const [name, setName] = useState('');
+  const [showTiming, setShowTiming] = useState(true);
   const [saveState, setSaveState] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -28,7 +30,12 @@ export function GamePanel({ bundle, mode, outbox, onResult }: { bundle: Bundle; 
     <h2>{bundle.song.title}</h2>
     <p>{mode === 'camera' ? 'Camera scoring' : 'Keyboard practice — separate from camera scores'}</p>
     {bundle.report.cache.source_kind === 'manual' && <p>This bundle was supplied manually with a validated report; its media provenance was not verified by the preparation worker.</p>}
-    <video ref={game.videoRef} src={bundle.videoUrl} controls playsInline preload="metadata" width="640" style={{ maxWidth: '100%' }} aria-label="Reference video" />
+    <label><input type="checkbox" checked={showTiming} onChange={e => setShowTiming(e.target.checked)} /> Show timing overlay</label>
+    <div style={{ position: 'relative', width: 640, maxWidth: '100%' }}>
+      <video ref={game.videoRef} src={bundle.videoUrl} controls playsInline preload="metadata" width="640" style={{ display: 'block', width: '100%' }} aria-label="Reference video" />
+      {showTiming && <TimingOverlay chart={bundle.chart} snapshot={s} mode={mode} />}
+    </div>
+    <p>Diamonds mark detected music beats. Pose bars mark scoring windows; press Enter during a bar in keyboard practice. Arrow keys still seek. Use this view to check the chart against the music; it does not prove beat detection is correct. Native video fullscreen hides the overlay.</p>
     {game.error && <p role="alert">{game.error}</p>}
     <p><button onClick={() => void game.toggle()}>Play / pause</button>{' '}<button onClick={replay}>Replay from beginning</button></p>
     {mode === 'camera' ? <div>
