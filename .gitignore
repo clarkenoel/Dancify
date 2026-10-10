@@ -1,0 +1,4 @@
+# Local launcher logs, lock and setup state.
+.launcher/
+scripts/__pycache__/
+scripts/tests/__pycache__/
