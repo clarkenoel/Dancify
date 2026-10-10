@@ -1,0 +1,103 @@
+name: Clean Seed
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "pipeline/**"
+      - "schema/**"
+      - ".github/workflows/clean-seed.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - "pipeline/**"
+      - "schema/**"
+      - ".github/workflows/clean-seed.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clean-seed-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            pipeline/requirements.txt
+
+      - name: Install backend and pipeline
+        run: |
+          python -m pip install \
+            -r backend/requirements.txt \
+            -r pipeline/requirements.txt
+          python -m pip check
+
+      - name: Generate and verify clean-checkout demo
+        env:
+          BASE_URL: http://127.0.0.1:8765
+          DANCIFY_DATA_DIR: ${{ runner.temp }}/dancify-data
+          MANIFEST: ${{ runner.temp }}/demo-seed-manifest.json
+          RESULTS: ${{ runner.temp }}/demo-seed-results.json
+        run: |
+          set -euo pipefail
+
+          python -m uvicorn app.main:app \
+            --app-dir backend \
+            --host 127.0.0.1 \
+            --port 8765 \
+            >"${RUNNER_TEMP}/dancify-backend.log" 2>&1 &
+          backend_pid=$!
+          trap 'kill "${backend_pid}" 2>/dev/null || true' EXIT
+
+          ready=0
+          for _ in {1..30}; do
+            if curl -fsS "${BASE_URL}/health" >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [[ "${ready}" != "1" ]]; then
+            cat "${RUNNER_TEMP}/dancify-backend.log"
+            exit 1
+          fi
+
+          BACKEND_PYTHON="$(command -v python)" \
+          PIPELINE_PYTHON="$(command -v python)" \
+          bash backend/scripts/bake_demo_songs.sh \
+            --manifest "${MANIFEST}" \
+            --results "${RESULTS}"
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          result = json.loads(Path(os.environ["RESULTS"]).read_text())
+          assert result["status"] == "ok", result
+          mandatory = result["mandatory"]
+          assert mandatory["status"] == "ready", mandatory
+          assert mandatory["move_count"] > 0, mandatory
+          verification = mandatory["verification"]
+          assert set(verification["sha256"]) == {"video", "chart", "audio"}
+          print(
+              "clean seed verified:",
+              mandatory["id"],
+              f"{mandatory['move_count']} moves",
+          )
+          PY
