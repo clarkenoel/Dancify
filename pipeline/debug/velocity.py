@@ -117,7 +117,7 @@ def main() -> int:
     joint = 15
     ax2.plot(times, raw[:, joint, 1], color="#888888", alpha=0.7, label="raw Y (wrist)")
     ax2.plot(times, smoothed[:, joint, 1], color="#27ae60", label="smoothed Y (wrist)")
-    ax2.set_xlabel("time (s) — same timeline as video.currentTime")
+    ax2.set_xlabel("time (s) — same timeline as HTMLMediaElement.currentTime")
     ax2.set_ylabel("landmark y")
     ax2.set_title("Raw vs smoothed overlay (left wrist)")
     ax2.legend(loc="upper right")

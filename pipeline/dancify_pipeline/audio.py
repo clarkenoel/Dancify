@@ -1,4 +1,4 @@
-"""Extract audio from video without changing speed (timeline = video.currentTime)."""
+"""Extract audio on the zero-based HTMLMediaElement.currentTime timeline."""
 
 from __future__ import annotations
 

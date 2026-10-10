@@ -50,7 +50,10 @@ def extract_poses(
                 idx += 1
                 continue
             pts = float(cap.get(cv2.CAP_PROP_POS_MSEC)) / 1000.0
-            t = pts if np.isfinite(pts) and pts > 0 else idx / src_fps
+            fallback_t = idx / src_fps
+            t = pts if np.isfinite(pts) and pts >= 0 else fallback_t
+            if times and t <= times[-1]:
+                t = max(fallback_t, times[-1] + frame_interval / src_fps)
             rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
             result = pose.process(rgb)
             lm = np.full((33, 4), np.nan, dtype=np.float64)
