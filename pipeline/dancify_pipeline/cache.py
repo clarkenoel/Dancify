@@ -18,6 +18,7 @@ def upload_chart(
     song_id: str,
     chart_path: Path,
     audio_path: Path | None = None,
+    report_path: Path | None = None,
     base_url: str = "http://127.0.0.1:8000",
 ) -> dict:
     url = f"{base_url.rstrip('/')}/songs/{song_id}/chart"
@@ -29,6 +30,12 @@ def upload_chart(
             Path(audio_path).name,
             Path(audio_path).read_bytes(),
             "audio/wav",
+        )
+    if report_path and Path(report_path).is_file():
+        files["report"] = (
+            Path(report_path).name,
+            Path(report_path).read_bytes(),
+            "application/json",
         )
     resp = requests.put(url, files=files, timeout=60)
     _require_success(resp, "cache upload")

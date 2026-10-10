@@ -54,6 +54,7 @@ def validate_dance_semantics(doc: dict[str, Any]) -> None:
     if not doc["moves"]:
         raise ValueError("moves must contain at least one usable target")
     seen_ids: set[str] = set()
+    previous_end = -1.0
     for index, move in enumerate(doc["moves"]):
         move_id = move["id"]
         if move_id in seen_ids:
@@ -67,6 +68,11 @@ def validate_dance_semantics(doc: dict[str, Any]) -> None:
             raise ValueError(
                 f"moves/{index} must satisfy 0 <= start < end <= duration"
             )
+        if start < previous_end:
+            raise ValueError("moves must be chronological and non-overlapping")
+        previous_end = end
+        if move["is_hold"] is not False:
+            raise ValueError(f"moves/{index}/is_hold=true is not supported")
         keyframe = np.asarray(move["keyframe_landmarks"], dtype=np.float64)
         if not usable_keyframe(keyframe):
             raise ValueError(f"moves/{index} has no usable visible keyframe")

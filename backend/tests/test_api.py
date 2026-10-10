@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 import json
+import sys
+import textwrap
+import time
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import main
-from app.db import SessionLocal
-from app.models import Play
+from app import preparation
+from app.db import SessionLocal, migrate_sqlite
+from app.models import Play, PreparationJob, utcnow
 from app.paths import SONGS_DIR
+from app.preparation import recover_interrupted_jobs
 
 VIDEO = b"0123456789-reference-video"
 AUDIO = b"abcdefghij-audio"
@@ -237,11 +243,13 @@ def test_extreme_numeric_literal_is_invalid_chart(client: TestClient) -> None:
     assert response.status_code == 400
 
 
-def test_source_and_video_replacements_invalidate_derived_data(
+def test_source_and_video_replacements_preserve_active_bundle(
     client: TestClient,
 ) -> None:
     song = ready_song(client)
     song_id = str(song["id"])
+    active_bundle_id = str(song["active_bundle_id"])
+    old_chart = client.get(f"/songs/{song_id}/chart").content
     folder = SONGS_DIR / song_id
     assert len(list(folder.glob("bundle-*"))) == 1
 
@@ -253,13 +261,15 @@ def test_source_and_video_replacements_invalidate_derived_data(
         },
     )
     assert changed_source.status_code == 200
-    assert changed_source.json()["status"] == "pending"
-    assert changed_source.json()["has_video"] is False
-    assert changed_source.json()["has_chart"] is False
-    assert changed_source.json()["has_audio"] is False
-    assert changed_source.json()["bpm"] is None
+    assert changed_source.json()["status"] == "ready"
+    assert changed_source.json()["has_video"] is True
+    assert changed_source.json()["has_chart"] is True
+    assert changed_source.json()["has_audio"] is True
+    assert changed_source.json()["bpm"] == 120
     assert changed_source.json()["error_message"] is None
-    assert not list(folder.glob("bundle-*"))
+    assert changed_source.json()["active_bundle_id"] == active_bundle_id
+    assert client.get(f"/songs/{song_id}/chart").content == old_chart
+    assert len(list(folder.glob("bundle-*"))) == 1
 
     client.post(
         f"/songs/{song_id}/video",
@@ -271,11 +281,11 @@ def test_source_and_video_replacements_invalidate_derived_data(
         files={"video": ("third.webm", b"third-video", "video/webm")},
     )
     assert replaced_video.status_code == 200
-    assert replaced_video.json()["status"] == "pending"
+    assert replaced_video.json()["status"] == "ready"
     assert replaced_video.json()["has_video"] is True
-    assert replaced_video.json()["has_chart"] is False
-    assert replaced_video.json()["has_audio"] is False
-    assert not list(folder.glob("bundle-*"))
+    assert replaced_video.json()["has_chart"] is True
+    assert replaced_video.json()["has_audio"] is True
+    assert len(list(folder.glob("bundle-*"))) == 2
     assert len(list(folder.glob("video-*"))) == 1
 
 
@@ -439,7 +449,11 @@ def test_create_and_update_normalize_input(client: TestClient) -> None:
     )
     assert too_long.status_code == 422
 
-    for source_url in ("not a url", "ftp://example.test/video"):
+    for source_url in (
+        "not a url",
+        "ftp://example.test/video",
+        "https://user:secret@example.test/video",
+    ):
         invalid_url = client.post(
             "/songs/json",
             json={"title": "Bad URL", "source_url": source_url},
@@ -470,3 +484,280 @@ def test_delete_removes_song_directory(client: TestClient) -> None:
 
     assert response.status_code == 204
     assert not folder.exists()
+
+
+@pytest.mark.parametrize("failure", ["overlap", "hold"])
+def test_unsupported_move_timeline_semantics_are_rejected(
+    client: TestClient, failure: str
+) -> None:
+    song = create_song(client)
+    payload = chart()
+    first = payload["moves"][0]  # type: ignore[index]
+    if failure == "overlap":
+        payload["moves"] = [  # type: ignore[index]
+            first,
+            {
+                **first,
+                "id": "m1",
+                "start": 1.5,
+                "end": 2.5,
+            },
+        ]
+    else:
+        payload["moves"] = [{**first, "is_hold": True}]  # type: ignore[index]
+
+    response = upload_bundle(client, str(song["id"]), payload=payload)
+
+    assert response.status_code == 422
+    assert response.json()["detail"].startswith("Invalid chart:")
+
+
+def test_immutable_bundle_routes_report_and_bundle_stamped_plays(
+    client: TestClient,
+) -> None:
+    song = ready_song(client)
+    song_id = str(song["id"])
+    first_bundle = str(song["active_bundle_id"])
+
+    for asset in ("video", "chart", "audio", "report"):
+        response = client.get(
+            f"/songs/{song_id}/bundles/{first_bundle}/{asset}"
+        )
+        assert response.status_code == 200
+    report = client.get(
+        f"/songs/{song_id}/bundles/{first_bundle}/report"
+    ).json()
+    assert report["cache"]["bundle_id"] == first_bundle
+    assert report["cache"]["source_kind"] == "manual"
+
+    first_play = client.post(
+        f"/songs/{song_id}/plays",
+        json={"player_name": "first", "score": 10},
+    )
+    assert first_play.status_code == 201
+    assert first_play.json()["bundle_id"] == first_bundle
+
+    replacement = client.post(
+        f"/songs/{song_id}/video",
+        files={"video": ("replacement.mp4", b"replacement", "video/mp4")},
+    )
+    assert replacement.status_code == 200
+    assert replacement.json()["active_bundle_id"] == first_bundle
+    second = upload_bundle(
+        client,
+        song_id,
+        payload=chart(bpm=90, move_id="replacement"),
+        audio=b"replacement-audio",
+    )
+    assert second.status_code == 200
+    second_bundle = second.json()["active_bundle_id"]
+    assert second_bundle != first_bundle
+    assert (
+        client.get(f"/songs/{song_id}/bundles/{first_bundle}/chart").status_code
+        == 200
+    )
+
+    historical_play = client.post(
+        f"/songs/{song_id}/plays",
+        json={"player_name": "old bundle", "score": 5, "bundle_id": first_bundle},
+    )
+    assert historical_play.status_code == 201
+    assert historical_play.json()["bundle_id"] == first_bundle
+    latest_play = client.post(
+        f"/songs/{song_id}/plays",
+        json={"player_name": "new bundle", "score": 15},
+    )
+    assert latest_play.json()["bundle_id"] == second_bundle
+
+
+def test_preparation_api_deduplicates_active_job_and_retries_failure(
+    client: TestClient,
+) -> None:
+    song = client.post(
+        "/songs/json",
+        json={"title": "URL song", "source_url": "https://example.test/video"},
+    ).json()
+    song_id = str(song["id"])
+
+    first = client.post(
+        f"/songs/{song_id}/preparations",
+        json={"source_kind": "url", "start_time": 1.0, "end_time": 15.0},
+    )
+    duplicate = client.post(f"/songs/{song_id}/preparations")
+
+    assert first.status_code == 202
+    assert duplicate.status_code == 202
+    assert duplicate.json()["id"] == first.json()["id"]
+    assert first.json()["status"] == "queued"
+    assert first.json()["attempt"] == 1
+    assert first.json()["source_kind"] == "url"
+    assert first.json()["start_time"] == 1.0
+    assert first.json()["end_time"] == 15.0
+    assert (
+        client.patch(
+            f"/songs/{song_id}",
+            json={"source_url": "https://example.test/changed"},
+        ).status_code
+        == 409
+    )
+    assert (
+        client.post(
+            f"/songs/{song_id}/video",
+            files={"video": ("changed.mp4", b"changed", "video/mp4")},
+        ).status_code
+        == 409
+    )
+    assert (
+        client.get(
+            f"/songs/{song_id}/preparations/{first.json()['id']}"
+        ).json()
+        == first.json()
+    )
+
+    with SessionLocal() as db:
+        job = db.get(PreparationJob, first.json()["id"])
+        assert job is not None
+        job.status = "failed"
+        job.stage = "failed"
+        job.error_code = "download_failed"
+        job.error_message = "upload fallback"
+        job.finished_at = utcnow()
+        db.commit()
+
+    retried = client.post(
+        f"/songs/{song_id}/preparations/{first.json()['id']}/retry"
+    )
+    assert retried.status_code == 202
+    assert retried.json()["id"] != first.json()["id"]
+    assert retried.json()["attempt"] == 2
+    assert retried.json()["retried_from_id"] == first.json()["id"]
+    assert retried.json()["status"] == "queued"
+    assert retried.json()["start_time"] == 1.0
+    assert retried.json()["end_time"] == 15.0
+
+
+def test_restart_marks_processing_job_interrupted(client: TestClient) -> None:
+    song = client.post(
+        "/songs/json",
+        json={"title": "Interrupted", "source_url": "https://example.test/video"},
+    ).json()
+    queued = client.post(f"/songs/{song['id']}/preparations").json()
+    with SessionLocal() as db:
+        job = db.get(PreparationJob, queued["id"])
+        assert job is not None
+        job.status = "processing"
+        job.stage = "pipeline"
+        job.started_at = utcnow()
+        db.commit()
+
+    assert recover_interrupted_jobs() == 1
+    recovered = client.get(
+        f"/songs/{song['id']}/preparations/{queued['id']}"
+    ).json()
+    assert recovered["status"] == "failed"
+    assert recovered["stage"] == "failed"
+    assert recovered["error_code"] == "interrupted"
+    assert recovered["finished_at"] is not None
+
+
+def test_lifespan_worker_runs_pipeline_subprocess(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    driver = tmp_path / "fake_prepare.py"
+    driver.write_text(
+        textwrap.dedent(
+            f"""
+            import argparse
+            import json
+            from pathlib import Path
+
+            parser = argparse.ArgumentParser()
+            parser.add_argument("--input")
+            parser.add_argument("--output-dir", type=Path)
+            parser.add_argument("--manifest", type=Path)
+            args = parser.parse_args()
+            args.output_dir.mkdir(parents=True, exist_ok=True)
+            video = args.output_dir / "video.mp4"
+            chart_path = args.output_dir / "dance.json"
+            audio = args.output_dir / "audio.wav"
+            report = args.output_dir / "dance.report.json"
+            video.write_bytes(Path(args.input).read_bytes())
+            chart_path.write_text(json.dumps({chart()!r}))
+            audio.write_bytes(b"audio")
+            report.write_text(json.dumps({{"version": "1.0", "status": "ready"}}))
+            args.manifest.write_text(json.dumps({{
+                "status": "succeeded",
+                "video": str(video.resolve()),
+                "chart": str(chart_path.resolve()),
+                "audio": str(audio.resolve()),
+                "report": str(report.resolve()),
+            }}))
+            """
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DANCIFY_PREPARATION_WORKER_ENABLED", "1")
+    monkeypatch.setenv("DANCIFY_PIPELINE_PYTHON", sys.executable)
+    monkeypatch.setattr(preparation, "PIPELINE_DRIVER", driver)
+    monkeypatch.setattr(preparation, "POLL_SECONDS", 0.01)
+
+    with TestClient(main.app, raise_server_exceptions=False) as worker_client:
+        song = create_song(worker_client)
+        queued = worker_client.post(
+            f"/songs/{song['id']}/preparations"
+        ).json()
+        deadline = time.monotonic() + 3
+        state = queued
+        while state["status"] not in {"succeeded", "failed"}:
+            assert time.monotonic() < deadline
+            time.sleep(0.02)
+            state = worker_client.get(
+                f"/songs/{song['id']}/preparations/{queued['id']}"
+            ).json()
+
+        assert state["status"] == "succeeded", state
+        assert state["stage"] == "complete"
+        assert state["result_bundle_id"]
+        detail = worker_client.get(f"/songs/{song['id']}").json()
+        assert detail["active_bundle_id"] == state["result_bundle_id"]
+        assert detail["active_preparation_job_id"] == queued["id"]
+
+
+def test_sqlite_column_migration_is_idempotent(tmp_path) -> None:
+    legacy_engine = create_engine(f"sqlite:///{tmp_path / 'legacy.db'}")
+    with legacy_engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE songs (id VARCHAR(36) PRIMARY KEY, video_path VARCHAR(512))"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE plays (id VARCHAR(36) PRIMARY KEY)"
+        )
+        connection.exec_driver_sql(
+            "CREATE TABLE preparation_jobs (id VARCHAR(36) PRIMARY KEY)"
+        )
+
+    migrate_sqlite(legacy_engine)
+    migrate_sqlite(legacy_engine)
+    with legacy_engine.connect() as connection:
+        song_columns = {
+            row[1]
+            for row in connection.exec_driver_sql("PRAGMA table_info(songs)").all()
+        }
+        play_columns = {
+            row[1]
+            for row in connection.exec_driver_sql("PRAGMA table_info(plays)").all()
+        }
+        preparation_columns = {
+            row[1]
+            for row in connection.exec_driver_sql(
+                "PRAGMA table_info(preparation_jobs)"
+            ).all()
+        }
+    assert {
+        "source_video_path",
+        "report_path",
+        "active_bundle_id",
+        "active_preparation_job_id",
+    }.issubset(song_columns)
+    assert "bundle_id" in play_columns
+    assert {"start_time", "end_time"}.issubset(preparation_columns)
