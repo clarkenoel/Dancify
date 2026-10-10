@@ -4,9 +4,10 @@ You are working on the prep pipeline only. Person A owns this directory.
 
 ## Scope
 
-- Python only in this directory. Coordinate `/backend` changes with its owner.
+- Python only in this directory. Person A also owns `/backend` (local FastAPI + SQLite song cache).
 - Do not touch `/web`, `/firmware`, or `/schema`.
 - Output must match `dance.schema.json` exactly.
+- After a successful run, cache the chart via `PUT /songs/{id}/chart` on the song-cache API so the game can skip recompute (see `backend/README.md` and `PRD.md` §7).
 - Cache only when the run report says `cache_ready_by_default=true`; synthetic
   timing requires explicit human override.
 
