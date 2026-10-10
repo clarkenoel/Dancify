@@ -81,8 +81,8 @@ Pose fixtures are in [`pipeline/fixtures/pose-normalization.json`](../../pipelin
 
 | Check | Result |
 |---|---|
-| Backend pytest | **42 passed** locally; CI initially failed because FFmpeg was absent and is now installed in the backend workflow |
-| Pipeline pytest | **39 passed** |
+| Backend pytest | **42 passed** locally; GitHub Backend is green after the workflow installs FFmpeg |
+| Pipeline pytest | **39 passed** locally; the workflow installs FFmpeg from the repository root so the step does not depend on the sparse checkout |
 | Full canonical diagnostic | Passed at the 2.00s gate; dropout identified at 60.28–62.24s |
 | Trimmed canonical seed | **BAKE OK**, 29 moves, ready bundle verified |
 | Local upload preparation | **PREPARATION SMOKE OK**, 14 moves, immutable bundle and play recorded |
