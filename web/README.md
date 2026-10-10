@@ -155,3 +155,44 @@ pause, seek, and replay. Arrow keys still seek; this does not invent directional
 notes or exact hit timestamps. Use it to compare detected beats with the music.
 Native video fullscreen displays only the video; keep the player inline to show
 the overlay. Artwork and human timing calibration remain follow-up work.
+
+## Planned session player identification
+
+The current camera runtime tracks a single person; it does not recognize faces
+or reliably lock identity when spectators enter. Require one player in frame
+until the new [webcam/player-lock plan](../docs/plans/webcam-player-lock.md) passes
+its acceptance gates.
+
+The planned flow pairs a stand-alone player via controller button (or explicit
+keyboard/on-screen confirmation), stores a face descriptor in browser memory for
+that session, and combines body continuity with face matching to retain/reacquire
+the player. Ambiguity pauses video and scoring; it never silently selects another
+person. Face data is neither uploaded nor persisted and is cleared on session
+completion/exit, re-pairing, and camera/mode changes. Models and thresholds remain
+to be selected and tested. This adds no account system, scoring input from the
+wearable, schema fields or changes to the solo reference-video pipeline.
+
+## Visible webcam tracking (W1 implementation)
+
+Camera mode now includes a selectable device, explicit enable/stop controls,
+a mirrored skeleton preview, current/next target pose, and a visible-joint count.
+The preview canvas draws the exact frozen frame that produced the landmarks so
+video and skeleton align even when inference is slower than camera capture.
+Only finite, in-frame gameplay joints above the existing visibility threshold
+are drawn. The skeleton can be hidden without changing scoring.
+
+States distinguish starting, finding a body, tracking with framing guidance,
+ready visibility, lost tracking, and camera failure. Ready means all 12 gameplay
+joints are visible and normalization succeeds; it does not establish identity,
+pose correctness or calibrated scoring. Face matching and multi-person player
+lock remain planned. Keep one player in frame.
+
+Changing/stopping cameras pauses reference playback, invalidates old captures,
+stops the previous stream, and clears the displayed camera frame. Enabling a
+replacement camera is explicit. Permission, unavailable-device, busy-camera and
+stalled-stream failures explain recovery; keyboard practice remains available.
+Preview mirroring does not change the existing unmirrored comparison convention.
+
+Automated validation uses recorded dancer footage through a simulated webcam.
+A real-player trial on the demo machine is still required to complete W1's human
+acceptance gate and measure latency, framing and left/right usability.

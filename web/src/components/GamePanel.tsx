@@ -4,6 +4,7 @@ import { useGame } from '../hooks/useGame';
 import type { ResultOutbox } from '../core/outbox';
 import { PoseTarget } from './PoseTarget';
 import { TimingOverlay } from './TimingOverlay';
+import { CameraPanel } from './CameraPanel';
 
 export function GamePanel({ bundle, mode, outbox, onResult }: { bundle: Bundle; mode: Mode; outbox: ResultOutbox; onResult: () => void }) {
   const game = useGame(bundle, mode);
@@ -38,11 +39,7 @@ export function GamePanel({ bundle, mode, outbox, onResult }: { bundle: Bundle; 
     <p>Diamonds mark detected music beats. Pose bars mark scoring windows; press Enter during a bar in keyboard practice. Arrow keys still seek. Use this view to check the chart against the music; it does not prove beat detection is correct. Native video fullscreen hides the overlay.</p>
     {game.error && <p role="alert">{game.error}</p>}
     <p><button onClick={() => void game.toggle()}>Play / pause</button>{' '}<button onClick={replay}>Replay from beginning</button></p>
-    {mode === 'camera' ? <div>
-      <video ref={game.cameraRef} muted playsInline width="320" style={{ maxWidth: '100%', transform: 'scaleX(-1)' }} aria-label="Webcam preview" />
-      <p><button onClick={() => void game.startCamera()} disabled={game.cameraState !== 'off'}>{game.cameraState === 'starting' ? 'Starting camera…' : game.cameraState === 'ready' ? 'Camera on' : 'Enable camera'}</button></p>
-      <p role="status">{game.tracking}</p><p>Your camera frames stay in this browser.</p>
-    </div> : <p><button onClick={game.hit} disabled={!s.playing}>Hit checkpoint</button> Press Enter during a checkpoint window, or use this button.</p>}
+    {mode === 'camera' ? <CameraPanel camera={game.camera} target={bundle.chart.moves.find(m => m.id === (s.activeId ?? s.upcomingIds[0]))} active={s.activeId !== null} /> : <p><button onClick={game.hit} disabled={!s.playing}>Hit checkpoint</button> Press Enter during a checkpoint window, or use this button.</p>}
     <p>Space: play/pause. R: replay. Left/right arrows: seek for practice. Form controls keep their normal keyboard behavior.</p>
     <p aria-label="Playback position">{s.time.toFixed(1)} / {s.duration.toFixed(1)} seconds</p>
     <p>Beat {bundle.chart.beat_times.filter(t => t <= s.time).length} / {bundle.chart.beat_times.length}</p>

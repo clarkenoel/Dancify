@@ -2,27 +2,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Bundle, Mode, PlayInput } from '../core/types';
 import { GameSession, type SessionSnapshot } from '../core/session';
 import { PlaybackController } from '../core/playback';
-import { CameraTracker } from '../core/camera';
+import type { PoseSample } from '../core/camera';
+import { useCamera } from './useCamera';
 import { WearableClient } from '../core/WearableClient';
 
 export function useGame(bundle: Bundle, mode: Mode) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const cameraRef = useRef<HTMLVideoElement>(null);
   const engine = useRef<GameSession | null>(null);
   const controller = useRef<PlaybackController | null>(null);
-  const tracker = useRef<CameraTracker | null>(null);
-  const lifecycle = useRef(0);
   const [snapshot, setSnapshot] = useState<SessionSnapshot>(() => new GameSession(bundle.chart, mode).snapshot());
   const [error, setError] = useState('');
-  const [cameraState, setCameraState] = useState<'off' | 'starting' | 'ready'>('off');
-  const [tracking, setTracking] = useState('Camera off');
   const [wearable] = useState(() => new WearableClient());
   const refresh = useCallback(() => { if (engine.current) setSnapshot(engine.current.snapshot()); }, []);
   useEffect(() => {
     const session = new GameSession(bundle.chart, mode); engine.current = session;
     const video = videoRef.current!;
     const playback = new PlaybackController(video, session, refresh, setError); controller.current = playback;
-    setSnapshot(session.snapshot()); setError(''); setCameraState('off'); setTracking('Camera off');
+    setSnapshot(session.snapshot()); setError('');
     const stopForBackground = () => { if (document.hidden) video.pause(); };
     document.addEventListener('visibilitychange', stopForBackground);
     const unsubscribe = wearable.subscribe(event => {
@@ -40,32 +36,23 @@ export function useGame(bundle: Bundle, mode: Mode) {
     };
     window.addEventListener('keydown', keyboard);
     return () => {
-      lifecycle.current++; tracker.current?.stop(); tracker.current = null;
       unsubscribe(); playback.dispose(); engine.current = null; controller.current = null;
       window.removeEventListener('keydown', keyboard); document.removeEventListener('visibilitychange', stopForBackground);
     };
   }, [bundle, mode, refresh, wearable]);
 
-  const startCamera = async () => {
-    if (!cameraRef.current || mode !== 'camera' || tracker.current) return;
-    const generation = lifecycle.current;
-    setError(''); setCameraState('starting');
-    const camera = new CameraTracker(cameraRef.current, () => ({ time: videoRef.current?.currentTime ?? 0, epoch: engine.current?.epoch ?? -1 }), sample => {
-      if (generation !== lifecycle.current) return;
-      const session = engine.current;
-      session?.tick(videoRef.current?.currentTime ?? 0);
-      session?.sample(sample.time, sample.epoch, sample.pose);
-      setTracking(sample.pose ? `Tracking body · ${Math.round(sample.inferenceMs)} ms inference` : 'Tracking lost — step back until shoulders, hips, and limbs are visible');
-    }, message => {
-      if (generation !== lifecycle.current) return;
-      tracker.current = null; setCameraState('off'); setTracking('Tracking lost'); setError(message); videoRef.current?.pause();
-    });
-    tracker.current = camera;
-    try { await camera.start(); if (generation === lifecycle.current && tracker.current === camera) setCameraState('ready'); }
-    catch (e) { if (generation === lifecycle.current) { tracker.current = null; setCameraState('off'); setError(e instanceof Error ? e.message : 'Camera access failed'); } }
-  };
+  const capture = useCallback(() => ({ time: videoRef.current?.currentTime ?? 0, epoch: engine.current?.epoch ?? -1 }), []);
+  const sample = useCallback((sample: PoseSample) => {
+    const session = engine.current;
+    session?.tick(videoRef.current?.currentTime ?? 0);
+    session?.sample(sample.time, sample.epoch, sample.pose);
+  }, []);
+  const stopForCameraChange = useCallback(() => {
+    videoRef.current?.pause(); engine.current?.pause(); refresh();
+  }, [refresh]);
+  const camera = useCamera(mode === 'camera', capture, sample, stopForCameraChange);
   return {
-    videoRef, cameraRef, snapshot, error, cameraState, tracking, startCamera, wearable,
+    videoRef, snapshot, error, camera, wearable,
     toggle: () => controller.current?.toggle().catch(e => setError(e.message)),
     replay: () => controller.current?.replay().catch(e => setError(e.message)),
     hit: () => { engine.current?.tick(videoRef.current?.currentTime ?? 0); engine.current?.keyboardHit(); refresh(); },

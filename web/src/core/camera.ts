@@ -3,7 +3,7 @@ import type { LandmarkTuple } from './types';
 import { normalizePose } from './pose';
 
 export interface CaptureStamp { time: number; epoch: number }
-export interface PoseSample extends CaptureStamp { pose: LandmarkTuple[] | null; raw: LandmarkTuple[]; inferenceMs: number }
+export interface PoseSample extends CaptureStamp { pose: LandmarkTuple[] | null; raw: LandmarkTuple[]; inferenceMs: number; frame: HTMLCanvasElement }
 type PoseConstructor = new (config: { locateFile: (name: string) => string }) => Pose;
 let runtime: Promise<PoseConstructor> | null = null;
 
@@ -34,12 +34,14 @@ export class CameraTracker {
   private canvas = document.createElement('canvas');
   private stamp: CaptureStamp = { time: 0, epoch: -1 };
   private startedAt = 0;
+  private lastProgress = 0;
   constructor(private video: HTMLVideoElement, private capture: () => CaptureStamp, private onPose: (sample: PoseSample) => void, private onError: (message: string) => void) {}
-  async start() {
+  async start(deviceId?: string) {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access requires localhost or HTTPS. Keyboard practice is available.');
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } });
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'user' }), width: { ideal: 640 }, height: { ideal: 480 } } });
       if (this.stopped) { this.stop(); return; }
+      this.stream.getVideoTracks().forEach(track => track.addEventListener('ended', () => { if (!this.stopped) { this.stop(); this.onError('Camera disconnected. Reconnect it or switch to keyboard practice.'); } }));
       this.video.srcObject = this.stream; await this.video.play();
       const Constructor = await loadRuntime();
       if (this.stopped) return;
@@ -49,20 +51,21 @@ export class CameraTracker {
       detector.onResults(result => {
         if (this.stopped) return;
         const raw: LandmarkTuple[] = (result.poseLandmarks ?? []).map(p => [p.x, p.y, p.z, p.visibility ?? 0]);
-        this.onPose({ ...this.stamp, raw, pose: normalizePose(raw, this.canvas.width, this.canvas.height), inferenceMs: performance.now() - this.startedAt });
+        this.onPose({ ...this.stamp, raw, pose: normalizePose(raw, this.canvas.width, this.canvas.height), inferenceMs: performance.now() - this.startedAt, frame: this.canvas });
       });
       this.operation = detector.initialize(); await this.operation; this.operation = null;
       if (this.stopped) return;
-      this.stream.getVideoTracks().forEach(track => track.addEventListener('ended', () => { if (!this.stopped) { this.stop(); this.onError('Camera disconnected. Reconnect it or switch to keyboard practice.'); } }));
+      this.lastProgress = performance.now();
       this.frame = requestAnimationFrame(this.loop);
     } catch (error) { this.stop(); throw error; }
   }
   private loop = (now: number) => {
     if (this.stopped) return;
+    if (now - this.lastProgress > 2500) { this.stop(); this.onError('Camera frames stopped arriving. Enable the camera again or choose another device.'); return; }
     if (!this.detector || this.video.readyState < 2 || this.video.currentTime === this.lastFrame || now - this.lastInference < 1000 / 15) {
       this.frame = requestAnimationFrame(this.loop); return;
     }
-    this.lastFrame = this.video.currentTime; this.lastInference = now;
+    this.lastFrame = this.video.currentTime; this.lastInference = now; this.lastProgress = now;
     this.canvas.width = this.video.videoWidth; this.canvas.height = this.video.videoHeight;
     this.stamp = this.capture(); this.startedAt = performance.now();
     this.canvas.getContext('2d')!.drawImage(this.video, 0, 0);
@@ -70,13 +73,16 @@ export class CameraTracker {
     // model's monotonic timestamp; stamp.time comes from the reference video.
     this.operation = this.detector.send({ image: this.canvas }, now);
     void this.operation.then(() => {
-      this.operation = null;
+      this.operation = null; this.lastProgress = performance.now();
       if (!this.stopped) this.frame = requestAnimationFrame(this.loop);
     }).catch(error => { if (!this.stopped) { this.stop(); this.onError(error instanceof Error ? error.message : 'Pose tracking failed'); } });
   };
   stop() {
     this.stopped = true; cancelAnimationFrame(this.frame);
-    this.stream?.getTracks().forEach(track => track.stop()); this.video.srcObject = null;
+    this.stream?.getTracks().forEach(track => track.stop());
+    if (this.video.srcObject === this.stream) this.video.srcObject = null;
+    // Discard the frozen camera pixels when this tracker is closed.
+    this.canvas.width = this.canvas.height = 0;
     const detector = this.detector; this.detector = undefined;
     if (detector) void Promise.resolve(this.operation).catch(() => {}).then(() => detector.close()).catch(() => {});
   }

@@ -63,7 +63,8 @@ test('real bundle decodes, pauses, seeks, replays, scores and saves exactly once
   expect(pageErrors).toEqual([]);
 });
 
-test('official local model detects a real dancer from a simulated webcam and stops on mode change', async ({ browser, request }) => {
+test('official local model renders the dancer skeleton, switches cameras and cleans up', async ({ browser, request }) => {
+  test.setTimeout(90000);
   // A real media fixture through getUserMedia, not mocked landmarks or a physical camera.
   const context = await browser.newContext({ permissions: ['camera'] });
   const page = await context.newPage();
@@ -75,13 +76,28 @@ test('official local model detects a real dancer from a simulated webcam and sto
   await page.getByRole('button', { name: song.title, exact: true }).click();
   await page.getByLabel('Game mode').selectOption('camera');
   await page.getByRole('button', { name: 'Enable camera' }).click();
-  await expect(page.getByText('Tracking body', { exact: false })).toBeVisible({ timeout: 30000 });
+  await expect(page.getByLabel('Body tracking status')).toContainText(/Ready|Tracking body/, { timeout: 40000 });
+  const skeleton = page.getByRole('img', { name: 'Tracked body skeleton', exact: true });
+  await expect.poll(() => skeleton.evaluate((c: HTMLCanvasElement) => c.width)).toBeGreaterThan(0);
+  await expect(page.getByLabel('Camera target pose')).toBeVisible();
+  await page.getByRole('region', { name: 'Player camera', exact: true }).screenshot({ path: test.info().outputPath('camera-preview.png') });
+  await page.getByRole('checkbox', { name: 'Show body skeleton' }).uncheck();
+  await expect(page.getByRole('checkbox', { name: 'Show body skeleton' })).not.toBeChecked();
+  await page.getByRole('checkbox', { name: 'Show body skeleton' }).check();
   const track = await page.getByLabel('Webcam preview').evaluateHandle((v: HTMLVideoElement) => (v.srcObject as MediaStream).getVideoTracks()[0]);
   await page.getByRole('button', { name: 'Play / pause', exact: true }).click();
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(500);
+  const device = await page.getByLabel('Camera device', { exact: true }).locator('option').nth(1).getAttribute('value');
+  await page.getByLabel('Camera device', { exact: true }).selectOption(device!);
+  expect(await track.evaluate(t => t.readyState)).toBe('ended');
+  await expect.poll(() => skeleton.evaluate((c: HTMLCanvasElement) => c.width)).toBe(0);
+  expect(await page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await page.getByRole('button', { name: 'Enable camera' }).click();
+  await expect(page.getByLabel('Body tracking status')).toContainText(/Ready|Tracking body/, { timeout: 40000 });
+  const replacement = await page.getByLabel('Webcam preview').evaluateHandle((v: HTMLVideoElement) => (v.srcObject as MediaStream).getVideoTracks()[0]);
   await page.getByLabel('Game mode').selectOption('keyboard_practice');
   await expect(page.getByLabel('Webcam preview')).toHaveCount(0);
-  expect(await track.evaluate(t => t.readyState)).toBe('ended');
+  expect(await replacement.evaluate(t => t.readyState)).toBe('ended');
   expect(external).toEqual([]);
   await context.close();
 });
@@ -122,4 +138,21 @@ test('download failure offers upload and leaves keyboard controls usable', async
   await page.getByRole('button', { name: 'Use upload fallback' }).click();
   await expect(page.getByLabel('Video file')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Create and prepare' })).toBeEnabled();
+});
+
+
+test('camera permission failure is actionable and keyboard practice remains available', async ({ page, request }) => {
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = async () => { throw new DOMException('Denied for test', 'NotAllowedError'); };
+  });
+  const songs = await (await request.get(`${api}/songs`)).json();
+  const song = songs.find((s: { status: string }) => s.status === 'ready');
+  await page.goto('/');
+  await page.getByRole('button', { name: song.title, exact: true }).click();
+  await page.getByLabel('Game mode').selectOption('camera');
+  await page.getByRole('button', { name: 'Enable camera' }).click();
+  await expect(page.getByRole('alert')).toContainText('Camera permission was denied');
+  await expect(page.getByRole('button', { name: 'Enable camera' })).toBeEnabled();
+  await page.getByLabel('Game mode').selectOption('keyboard_practice');
+  await expect(page.getByRole('button', { name: 'Hit checkpoint' })).toBeVisible();
 });

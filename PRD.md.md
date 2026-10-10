@@ -1,14 +1,15 @@
 # PRD — Dancify (Wearable Rhythm Game)
 
-**Version:** 1.1
+**Version:** 1.2
 **Last updated:** 2026-10-10
 **Owner:** [Your name]
 **Status:** Active development — 48-hour hackathon build
 
 This document describes the product vision and target architecture. The shipped
 prep implementation is a narrower hackathon MVP: short, stable, solo-dancer CFR
-clips only. Multi-person identity isolation, angular-velocity energy, and hold
-merging are explicitly deferred. See `pipeline/README.md` and
+clips only. Reference-video multi-person identity isolation, angular-velocity
+energy, and hold merging remain deferred. Live webcam session player identification
+is now planned separately in §4.2.1; it is not implemented. See `pipeline/README.md` and
 `pipeline/CALIBRATION.md` for the implemented contract.
 
 ---
@@ -27,7 +28,7 @@ A Just Dance clone that works on any dance video: paste a TikTok or YouTube link
 
 ## 3. Build Order — Vision First, Hardware Later
 
-**This is a deliberate reordering.** The vision pipeline (MediaPipe + joint smoothing + primary subject isolation) is the highest-risk unknown and must be validated before anything else is built. The hardware (ESP32 + joystick + piezos) is a known quantity and can be built later without risk.
+**This is a deliberate reordering.** The vision pipeline (MediaPipe + joint smoothing + primary subject isolation) is the highest-risk unknown and must be validated before anything else is built. The hardware (ESP32 + rotary angle sensor + single button + piezos) is a known quantity and can be built later without risk.
 
 **Rules:**
 - Hardware firmware is built in **Phase 3**, not Phase 1.
@@ -70,7 +71,7 @@ Three independent pieces plus one shared contract layer.
 
 **Runtime flow:**
 1. Load the reference video, `dance.json`, and aligned audio sidecar bundle.
-2. Turn on webcam, run MediaPipe PoseLandmarker on the live feed (GPU delegate).
+2. Turn on webcam and run local pose inference. Planned: explicitly pair the player and maintain their session identity as described in §4.2.1 before accepting camera scoring samples.
 3. **Master clock = the reference `<video>` element's `currentTime`** (not `performance.now()`, not `AudioContext`, and not a separate audio element).
 4. On each frame:
    - Read `t = referenceVideo.currentTime`.
@@ -90,23 +91,51 @@ Three independent pieces plus one shared contract layer.
 - If torso or too few joints are visible, **return `null`, not 0**. The game loop distinguishes miss vs. lost-tracking.
 - Comparison metric: cosine similarity of joint-angle vectors, weighted toward arms and legs.
 
-**The game must remain fully playable with keyboard only.** Arrow keys simulate joystick directions. Enter simulates the button. This is the demo-day fallback if Bluetooth fails.
+**The game must remain fully playable with keyboard only.** In menus, arrow keys move focus through items and Enter activates the focused item, matching rotary navigation and the single button. Gameplay keyboard bindings remain context-specific. This is the demo-day fallback if Bluetooth fails.
+
+### 4.2.1 Session player identification (planned)
+
+Pair the player standing alone in the camera guide with the connected controller
+using a button confirmation, with an explicit keyboard/on-screen fallback. Keep
+a temporary face descriptor in browser memory associated with that body track.
+Use multi-person body tracking and face-to-body association to maintain the
+selected player when spectators enter; face matching supports confirmation and
+reacquisition rather than being required on every frame.
+
+If identity is ambiguous, reject samples and pause reference playback/scoring.
+Never silently switch to another person. Confident reacquisition requires player
+confirmation; explicit re-pairing starts a new run. The controller identifies a
+device, not its wearer, and pairing never awards points.
+
+Face images/descriptors are session-only: no network transmission, persistent
+storage, logs, saved-result fields or cross-session identity. Clear references at
+session end/exit, re-pairing and camera/mode changes. This is not account login
+or authentication. All models run locally in the browser.
+
+The current single-person tracker does not implement this behavior. Multi-person
+tracking, face matching, model selection and real-player validation are required.
+The reference-video preparation pipeline remains solo-dancer only; chart schemas
+and BLE messages remain frozen. See the [webcam implementation plan](docs/plans/webcam-player-lock.md)
+for lifecycle rules, phases W1–W6, acceptance gates and unresolved model choices.
 
 ### 4.3 The Wearable (ESP32 firmware) — Built in Phase 3
 
 **Hardware:**
 - ESP32 dev board.
-- Analog joystick module (KY-023 or similar). VRx and VRy **must** connect to ADC1 pins (GPIO 32–39). ADC2 pins conflict with the BLE radio.
+- Rotary angle sensor for rotational menu navigation; replaces the joystick. Exact sensor model, electrical interface, travel range, and wiring remain to be confirmed. If the chosen sensor has an analog output, use an ADC1-capable pin; do not assume a two-axis joystick pinout.
+- One physical button for selecting/confirming the focused item and explicit player pairing.
+- No wearable-controlled mouse pointer or two-axis cursor navigation.
 - Two passive piezo buzzers wired **in parallel** to a single GPIO through a shared 100Ω resistor.
 - Velcro strap or sweatband for forearm mounting.
 
 **Firmware behavior:**
-- Poll joystick ADC at 50Hz from a FreeRTOS task (not the main loop — BLE starves it).
-- Deadzone filter: ~15% around center, with hysteresis. Below deadzone → `(0, 0)`. Above → remap to `-1.0 .. 1.0`.
-- Median filter (last 5 samples) before the deadzone to kill spikes.
+- Sample the rotary angle sensor on a scheduled task without blocking BLE; choose cadence and filtering for the actual sensor.
+- Convert signed angle changes into discrete navigation steps: clockwise advances/scrolls forward, counterclockwise moves/scrolls backward. Accumulate small changes until a step threshold is reached; suppress jitter so a stationary control emits no steps.
+- For continuous-angle sensors, handle wraparound without a large false jump. For limited-travel sensors, define endpoint behavior after hardware selection; do not assume endless rotation.
+- Debounce the single button. Rotation moves menu focus or scrolls the focused list; button press selects/confirms. Keep the focused item visible. There is no cursor to steer.
 - Two BLE characteristics:
   - **RX** (browser → ESP32, write): `BPM:120`, `BEAT:0.5`, `HIT:1`, `TONE:880`, `SYNC:0.512`.
-  - **TX** (ESP32 → browser, notify): `JOY:x,y` at 5Hz (debug heartbeat), `DIR:UP|DOWN|LEFT|RIGHT` on zone transitions, `BTN:DOWN|UP|CLICK|HOLD`.
+  - **TX** (ESP32 → browser, notify): rotary navigation steps and single-button actions. The wire encoding for rotary steps is pending an interface decision; see §5.2. Existing `BTN:DOWN|UP|CLICK|HOLD` messages remain the button contract.
 - **Piezo driven via the LEDC peripheral, not `tone()`.** LEDC is a hardware timer — no CPU involvement during playback, no jitter from BLE preemption.
 - **Piezo timing:** browser sends `BPM` and initial `BEAT` phase once. ESP32 fires on its own hardware timer. Browser sends `SYNC` every ~5 seconds; ESP32 slews its offset (does not jump).
 
@@ -165,11 +194,19 @@ hip-center origin and torso-length scale.
 **RX Characteristic UUID:** `[TBD]` (browser writes)
 **TX Characteristic UUID:** `[TBD]` (ESP32 notifies)
 
-**Message formats:**
+**Existing frozen message formats (legacy joystick contract; rotary mapping pending):**
 - Browser → ESP32: `BPM:<int>`, `BEAT:<float>`, `HIT:1`, `TONE:<int>`, `SYNC:<float>`
 - ESP32 → browser: `JOY:<float>,<float>`, `DIR:<UP|DOWN|LEFT|RIGHT>`, `BTN:<DOWN|UP|CLICK|HOLD>`
 
 All messages UTF-8 strings, newline-terminated optional.
+
+**Rotary transition:** §4.3 supersedes joystick input in the product design. The
+formats above document the currently frozen interface, not a requirement to send
+joystick coordinates from the new hardware. Before firmware/web integration,
+decide whether rotary forward/back steps map to existing directional messages
+or require a reviewed protocol revision. No new wire messages, schema edits,
+firmware implementation, or sensor pin assignment are authorized by this PRD
+update alone. The single button remains; the wearable never contributes score.
 
 ---
 
@@ -251,12 +288,16 @@ This de-risks the pipeline by making the user responsible for choosing a clean i
 
 ## 10. 48-Hour Roadmap (Vision-First Ordering)
 
+The following is the original hackathon schedule. The newly approved live webcam
+player-lock work follows phases W1–W6 in the [webcam plan](docs/plans/webcam-player-lock.md);
+it is not a completed gate or a change to the solo reference-video MVP.
+
 | Phase | Hours | Goal | Gate |
 |---|---|---|---|
 | 0 | 0–2 | Foundation | Contracts frozen, everyone committed |
 | 1 | 2–14 | Vision pipeline + game skeleton | Pipeline correct on 3 videos, MediaPipe works on real webcam, subject isolation tracks correctly, joint smoothing validated |
 | 2 | 14–20 | Vision end-to-end | One real video → play → score, no fake data |
-| 3 | 20–30 | Hardware bring-up + integration | BLE works, piezo on beat, joystick navigates menu |
+| 3 | 20–30 | Hardware bring-up + integration | BLE works, piezo on beat, rotary control scrolls menus and button selects |
 | 4 | 30–40 | Features + juice | Three consistent playthroughs, no crashes |
 | 5 | 40–46 | Feature freeze + demo prep | Rehearsed, backed-up demo on demo machine |
 | 6 | 46–48 | Demo | Demo happens |
@@ -330,15 +371,15 @@ This de-risks the pipeline by making the user responsible for choosing a clean i
 **Now the hardware gets built.** Person C leads, Person B supports on integration.
 
 **Person C — Wearable:**
-- Wire ESP32: joystick on ADC1 pins (GPIO 32–39), two piezos in parallel on one GPIO through shared 100Ω resistor, button on digital pin with `INPUT_PULLUP`.
-- Flash firmware: BLE service up, joystick polling task at 50Hz, deadzone, `DIR:*` / `BTN:*` events over TX, `BPM`/`BEAT`/`HIT`/`SYNC`/`TONE` over RX.
+- Confirm the rotary angle sensor model/interface and wire it to compatible ESP32 pins (ADC1 if analog). Wire two piezos in parallel on one GPIO through a shared 100Ω resistor and the single button on a digital pin with `INPUT_PULLUP`.
+- Agree the rotary-to-BLE mapping in §5.2 before integration. Flash firmware with nonblocking sensor sampling, filtered angle-to-step conversion, debounced button events, and the existing `BPM`/`BEAT`/`HIT`/`SYNC`/`TONE` RX commands.
 - Piezo on **LEDC peripheral**, not `tone()`.
 - Confirm timing: hardcoded 120 BPM for 60 seconds, measure drift. Target < 20ms over 60 seconds.
-- Confirm deadzone: stick at center for 60 seconds, zero phantom events.
+- Confirm the stationary rotary control produces zero phantom navigation steps for 60 seconds. Test slow/fast rotation, reversals, and wraparound or endpoints as applicable.
 
 **Person B — Integration:**
 - Swap `WearableClient.ts` from fake source to real BLE. Event stream shape unchanged.
-- Wire joystick events into menu navigation.
+- Map rotary steps into ordered menu focus/list scrolling (clockwise forward, counterclockwise backward), with no mouse cursor. Keep selection visible; the single button confirms selection or player pairing according to the current screen.
 - Wire `HIT:1` to fire on scored hits.
 - Wire `SYNC` every 5s.
 - Keyboard fallback still works when ESP32 is unplugged.
@@ -352,7 +393,7 @@ This de-risks the pipeline by making the user responsible for choosing a clean i
 
 **Gates:**
 1. Wearable connects over BLE to the game in Chrome.
-2. Joystick navigates the menu. Button selects. No phantom events over 60 seconds.
+2. Rotary motion navigates/scrolls menus in both directions; the single button selects and confirms pairing. No phantom steps over 60 stationary seconds; reversals and wraparound/endpoints behave correctly.
 3. Piezo fires on the beat with < 20ms drift over 60 seconds.
 4. `HIT:1` fires a triple-click on scored hits.
 5. Keyboard fallback works with the ESP32 unplugged.
@@ -392,13 +433,13 @@ This de-risks the pipeline by making the user responsible for choosing a clean i
 ## 12. Risks (Ranked)
 
 1. **MediaPipe fails on real hardware or real videos.** Mitigation: validated in Phase 1, not Phase 4. Test harness from Person C surfaces failures early.
-2. **Primary subject isolation picks the wrong person in multi-person clips.** Mitigation: validated as a Phase 1 gate on a real 2-person clip.
+2. **Live webcam identity switches to a spectator.** Mitigation: explicit pairing, body continuity plus session face matching, pause on uncertainty, and crossing/exit/re-entry trials before claiming multi-person support. Reference-video multi-person isolation remains deferred; reject unsuitable prep clips.
 3. **Joint smoothing lags fast motion or fails to reduce jitter.** Mitigation: raw-vs-smoothed overlay as a Phase 1 gate.
 4. **Web Bluetooth fails on the demo machine.** Mitigation: keyboard fallback ships from Phase 1. Never demo without it.
 5. **Pictograms look bad.** Mitigation: hero pictograms from the artist as insurance.
 6. **Prep pipeline takes too long per video.** Mitigation: hardcode 2–3 pre-processed videos for the demo.
 7. **Piezo jitter due to BLE preemption.** Mitigation: LEDC hardware timer. Test in Phase 3.
-8. **Joystick ADC noise causes phantom directions.** Mitigation: 15% deadzone, median filter, per-unit calibration.
+8. **Rotary sensor noise or angle wraparound causes unintended scrolling.** Mitigation: confirm the sensor interface/travel range, filter angle changes, calibrate navigation step thresholds, and test stationary input, reversals, wraparound or endpoints. Debounce the single button separately.
 9. **Hardware bring-up gets squeezed if vision runs long.** Mitigation: BLE contract frozen in Phase 0; `WearableClient.ts` built against fake source in Phase 1.
 
 ---
@@ -409,7 +450,10 @@ A demo is "done" when:
 
 - One real video flows from import → pipeline → playable chart with no manual fixups.
 - The game plays end-to-end on the demo machine with a real webcam.
-- The wearable clicks on beat and navigates the menu over BLE.
+- Before advertising session player lock: spectator entry/crossing cannot silently
+  change the scored player; ambiguity pauses play, session face data is cleared,
+  and the webcam plan acceptance gates pass on the demo machine.
+- The wearable clicks on beat; its rotary angle sensor scrolls menu focus over BLE and its single button selects/confirms. No wearable mouse control is required.
 - Keyboard fallback works when the wearable is unplugged.
 - Three consecutive playthroughs produce consistent scores.
 - A backup video of the full demo exists.
