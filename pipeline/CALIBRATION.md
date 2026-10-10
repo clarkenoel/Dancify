@@ -35,6 +35,13 @@ This implementation is intentionally narrower than the full PRD:
 7. Exclude invalid tracking frames/keyframes; flat or unusable motion fails
    instead of falling back to a full chart.
 
+The exported move is one **static checkpoint**, not continuous choreography.
+Its `start`/`end` values are a comparison window (normally about 0.5s), and
+`keyframe_landmarks` contains only the selected valley pose. Window clipping can
+move the midpoint away from the snapped hit. Exact `hit_time` and
+`source_pose_time` fields are proposed in
+`../docs/handoffs/hit-timing-rfc.md` but are not part of frozen chart `1.0`.
+
 If no prominent valley exists but motion is usable, fallback searches for a
 local valid minimum every two **whole** beats. It never steps every two
 half-beat grid slots.

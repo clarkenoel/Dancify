@@ -11,12 +11,20 @@ LEFT_HIP = 23
 RIGHT_HIP = 24
 
 
-def normalize_frame(landmarks: np.ndarray) -> np.ndarray:
+def normalize_frame(
+    landmarks: np.ndarray, aspect_ratio: float = 1.0
+) -> np.ndarray:
     """Normalize one frame of shape (33, 4) → hip-center origin, torso-length scale.
 
-    landmarks columns: x, y, z, visibility (visibility is not scaled).
+    x/y are MediaPipe image-space coordinates. x and z use image-width units,
+    so both are converted to image-height units before 3D normalization.
+    Visibility is copied unchanged.
     """
+    if not np.isfinite(aspect_ratio) or aspect_ratio <= 0:
+        raise ValueError("aspect_ratio must be finite and positive")
     out = landmarks.astype(np.float64).copy()
+    out[:, 0] *= aspect_ratio
+    out[:, 2] *= aspect_ratio
     hip = 0.5 * (out[LEFT_HIP, :3] + out[RIGHT_HIP, :3])
     shoulder = 0.5 * (out[LEFT_SHOULDER, :3] + out[RIGHT_SHOULDER, :3])
     if not np.all(np.isfinite(hip)) or not np.all(np.isfinite(shoulder)):
@@ -30,6 +38,11 @@ def normalize_frame(landmarks: np.ndarray) -> np.ndarray:
     return out
 
 
-def normalize_sequence(frames: np.ndarray) -> np.ndarray:
+def normalize_sequence(
+    frames: np.ndarray, aspect_ratio: float = 1.0
+) -> np.ndarray:
     """frames: (T, 33, 4) → same shape, per-frame normalized."""
-    return np.stack([normalize_frame(f) for f in frames], axis=0)
+    return np.stack(
+        [normalize_frame(f, aspect_ratio=aspect_ratio) for f in frames],
+        axis=0,
+    )

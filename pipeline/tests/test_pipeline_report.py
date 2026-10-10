@@ -8,6 +8,7 @@ import pytest
 
 import dancify_pipeline.pipeline as pipeline_module
 from dancify_pipeline.beats import BeatTrack
+from dancify_pipeline.tracking import TrackingQualityError
 
 
 def test_pipeline_writes_synthetic_readiness_sidecar(
@@ -29,6 +30,9 @@ def test_pipeline_writes_synthetic_readiness_sidecar(
     )
     monkeypatch.setattr(
         pipeline_module, "video_duration_seconds", lambda _path: 3.0
+    )
+    monkeypatch.setattr(
+        pipeline_module, "video_aspect_ratio", lambda _path: 16 / 9
     )
     monkeypatch.setattr(
         pipeline_module,
@@ -72,3 +76,79 @@ def test_pipeline_writes_synthetic_readiness_sidecar(
     assert report["timing"]["source"] == "explicit_fallback"
     assert report["readiness"]["cache_ready_by_default"] is False
     assert json.loads(output.read_text(encoding="utf-8"))["version"] == "1.0"
+
+
+def test_pipeline_persists_diagnostics_before_tracking_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    valid_landmarks: np.ndarray,
+) -> None:
+    video = tmp_path / "video.mp4"
+    video.touch()
+    output = tmp_path / "dance.json"
+    times = np.arange(180) / 30.0
+    frames = np.stack([valid_landmarks.copy() for _ in times])
+    frames[30:96, :, :3] = np.nan
+    frames[30:96, :, 3] = 0.0
+    valid = np.ones(len(times), dtype=bool)
+    valid[30:96] = False
+    confidence = np.where(valid, 0.95, 0.0)
+
+    monkeypatch.setattr(
+        pipeline_module, "resolve_input", lambda *_args, **_kwargs: video
+    )
+    monkeypatch.setattr(
+        pipeline_module, "video_duration_seconds", lambda _path: 6.0
+    )
+    monkeypatch.setattr(
+        pipeline_module, "video_aspect_ratio", lambda _path: 16 / 9
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "extract_audio",
+        lambda _video, path, **_kwargs: Path(path).write_bytes(b"wav"),
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "track_beats",
+        lambda *_args, **_kwargs: BeatTrack(
+            bpm=120.0,
+            beat_times=[i * 0.5 for i in range(13)],
+            source="audio",
+            synthetic=False,
+            downbeat=0.0,
+            reason=None,
+        ),
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "extract_poses",
+        lambda *_args, **_kwargs: (times, frames, valid, confidence),
+    )
+    monkeypatch.setattr(
+        pipeline_module,
+        "render_tracking_video",
+        lambda _video, path, **_kwargs: Path(path).write_bytes(b"video"),
+    )
+
+    with pytest.raises(TrackingQualityError, match="1.00-3.17s"):
+        pipeline_module.run_pipeline(
+            str(video),
+            output,
+            work_dir=tmp_path / "work",
+        )
+
+    report = json.loads(
+        (tmp_path / "dance.report.json").read_text(encoding="utf-8")
+    )
+    tracking = json.loads(
+        (tmp_path / "dance.tracking.json").read_text(encoding="utf-8")
+    )
+    assert report["status"] == "failed"
+    assert report["tracking"]["failure_code"] == "long_dropout"
+    assert report["diagnostics"]["video"].endswith("dance.tracking.mp4")
+    assert tracking["tracking"]["invalid_runs"][0]["start_time"] == pytest.approx(
+        1.0
+    )
+    assert (tmp_path / "work" / "debug_arrays.npz").is_file()
+    assert not output.exists()

@@ -6,9 +6,12 @@ You are working on the game frontend only. Person B owns this directory.
 
 - TypeScript/React only. Do not touch `/pipeline`, `/firmware`, `/backend`, or `/schema`.
 - `WearableClient.ts` is the only module that touches Web Bluetooth.
-- Read `dance.json` — never write it. Prefer loading ready bundles from the local song-cache API (`http://127.0.0.1:8000`, see `backend/README.md` / `PRD.md.md` §7).
+- Read `dance.json` — never write it. Load the API base URL from configuration
+  (`VITE_DANCIFY_API_URL`, default `http://127.0.0.1:8000`) and prefer immutable
+  ready bundles (see `backend/README.md` / `PRD.md.md` §7).
 - **Handoff from Person A:** read [`../pipeline/WEB_HANDOFF.md`](../pipeline/WEB_HANDOFF.md) and [`../pipeline/NORMALIZATION.md`](../pipeline/NORMALIZATION.md) — load `GET /songs/{id}/video`, `/chart`, and `/audio`, then normalize live poses identically before compare.
 - You may **call** `/backend` HTTP endpoints; do not rewrite the backend. POST play results to `/songs/{id}/plays` after a run.
+- Follow [`../docs/handoffs/gameplay-integration-contract.md`](../docs/handoffs/gameplay-integration-contract.md) for checkpoint, bundle-version, seek/replay, and delayed-inference behavior.
 
 ## Commands
 

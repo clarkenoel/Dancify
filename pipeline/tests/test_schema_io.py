@@ -67,6 +67,22 @@ def test_semantic_chart_rejects_invalid_window(valid_landmarks: np.ndarray) -> N
         validate_dance(doc)
 
 
+def test_semantic_chart_rejects_overlap(valid_landmarks: np.ndarray) -> None:
+    doc = _document(valid_landmarks)
+    second = copy.deepcopy(doc["moves"][0])
+    second.update({"id": "m1", "start": 0.5, "end": 0.9})
+    doc["moves"].append(second)
+    with pytest.raises(ValueError, match="chronological and non-overlapping"):
+        validate_dance(doc)
+
+
+def test_semantic_chart_rejects_hold(valid_landmarks: np.ndarray) -> None:
+    doc = _document(valid_landmarks)
+    doc["moves"][0]["is_hold"] = True
+    with pytest.raises(ValueError, match="is_hold=true"):
+        validate_dance(doc)
+
+
 def test_semantic_chart_rejects_invisible_target(valid_landmarks: np.ndarray) -> None:
     doc = _document(valid_landmarks)
     doc["moves"][0]["keyframe_landmarks"] = np.zeros((33, 4)).tolist()

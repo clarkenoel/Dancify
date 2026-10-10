@@ -30,6 +30,36 @@ def test_mark_processing_raises_on_http_error(
         cache.mark_processing("missing")
 
 
+def test_cache_upload_includes_pipeline_report(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    chart = tmp_path / "dance.json"
+    audio = tmp_path / "audio.wav"
+    report = tmp_path / "dance.report.json"
+    chart.write_text('{"version":"1.0"}', encoding="utf-8")
+    audio.write_bytes(b"wav")
+    report.write_text('{"status":"ready"}', encoding="utf-8")
+    captured: dict = {}
+
+    def fake_put(_url, *, files, timeout):
+        captured.update(files)
+        assert timeout == 60
+        return FakeResponse(200, payload={"status": "ready"})
+
+    monkeypatch.setattr(cache.requests, "put", fake_put)
+
+    cache.upload_chart(
+        "song",
+        chart,
+        audio_path=audio,
+        report_path=report,
+    )
+
+    assert captured["report"][0] == "dance.report.json"
+    assert captured["report"][1] == b'{"status":"ready"}'
+    assert captured["report"][2] == "application/json"
+
+
 def test_cli_fails_before_pipeline_when_cache_state_fails(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

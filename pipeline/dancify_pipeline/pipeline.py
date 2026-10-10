@@ -10,18 +10,26 @@ import numpy as np
 
 from .audio import extract_audio
 from .beats import track_beats
+from .diagnostics import (
+    build_tracking_payload,
+    render_tracking_video,
+    write_partial_debug_arrays,
+    write_tracking_json,
+)
 from .energy import motion_energy
 from .hits import build_moves, select_musical_hits
-from .ingest import resolve_input, video_duration_seconds
+from .ingest import resolve_input, video_aspect_ratio, video_duration_seconds
 from .normalize import normalize_sequence
 from .pose import extract_poses
 from .schema_io import write_dance_json
 from .smooth import smooth_landmarks
 from .tracking import (
+    TrackingQualityError,
+    evaluate_stable_tracking,
     frame_confidence,
+    frame_tracking_breakdown,
     frame_tracking_mask,
     interpolate_short_gaps,
-    require_stable_tracking,
 )
 
 
@@ -39,6 +47,7 @@ def run_pipeline(
 
     video = resolve_input(input_path, work_dir)
     duration = video_duration_seconds(video)
+    aspect_ratio = video_aspect_ratio(video)
 
     audio_path = Path(save_audio) if save_audio else work_dir / "audio.wav"
     extract_audio(video, audio_path, video_duration=duration)
@@ -56,8 +65,79 @@ def run_pipeline(
     smoothed = smooth_landmarks(interpolated)
     frame_valid = frame_tracking_mask(smoothed)
     confidence = frame_confidence(smoothed)
-    tracking = require_stable_tracking(times, frame_valid)
-    normalized = normalize_sequence(smoothed)
+    evaluation = evaluate_stable_tracking(times, frame_valid)
+    report_path = Path(output_json).with_name(f"{Path(output_json).stem}.report.json")
+    tracking_path = Path(output_json).with_name(
+        f"{Path(output_json).stem}.tracking.json"
+    )
+    diagnostic_video_path = Path(output_json).with_name(
+        f"{Path(output_json).stem}.tracking.mp4"
+    )
+    tracking_payload = build_tracking_payload(
+        times,
+        raw,
+        interpolated,
+        smoothed,
+        confidence,
+        evaluation,
+    )
+    write_tracking_json(tracking_path, tracking_payload)
+    write_partial_debug_arrays(
+        work_dir / "debug_arrays.npz",
+        times=times,
+        raw=raw,
+        interpolated=interpolated,
+        smoothed=smoothed,
+        raw_frame_valid=raw_frame_valid,
+        raw_frame_confidence=raw_confidence,
+        frame_valid=frame_valid,
+        frame_confidence=confidence,
+    )
+    if not evaluation.valid:
+        try:
+            render_tracking_video(
+                video,
+                diagnostic_video_path,
+                times=times,
+                landmarks=raw,
+                confidence=confidence,
+                breakdown=frame_tracking_breakdown(smoothed),
+            )
+            tracking_payload["diagnostic_video"] = str(diagnostic_video_path)
+        except Exception as exc:  # noqa: BLE001
+            tracking_payload["diagnostic_video_error"] = str(exc)
+        write_tracking_json(tracking_path, tracking_payload)
+        failure_report = {
+            "version": "1.0",
+            "status": "failed",
+            "chart": str(Path(output_json)),
+            "timing": timing.to_report(),
+            "tracking": evaluation.to_dict(),
+            "diagnostics": {
+                "tracking": str(tracking_path),
+                "video": (
+                    str(diagnostic_video_path)
+                    if diagnostic_video_path.is_file()
+                    else None
+                ),
+                "arrays": str(work_dir / "debug_arrays.npz"),
+            },
+            "readiness": {
+                "cache_ready_by_default": False,
+                "synthetic_timing": timing.synthetic,
+                "solo_cfr_mvp": True,
+            },
+        }
+        report_path.write_text(
+            json.dumps(failure_report, indent=2, allow_nan=False) + "\n",
+            encoding="utf-8",
+        )
+        raise TrackingQualityError(
+            evaluation.message or "Tracking failed",
+            evaluation,
+        )
+    tracking = evaluation.stats
+    normalized = normalize_sequence(smoothed, aspect_ratio=aspect_ratio)
 
     energy = motion_energy(normalized, times, frame_valid=frame_valid)
     hits, key_idxs = select_musical_hits(
@@ -99,16 +179,22 @@ def run_pipeline(
     }
     write_dance_json(doc, output_json)
 
-    report_path = Path(output_json).with_name(f"{Path(output_json).stem}.report.json")
     report = {
         "version": "1.0",
+        "status": "ready",
         "chart": str(Path(output_json)),
         "timing": timing.to_report(),
-        "tracking": tracking.to_dict(),
+        "tracking": evaluation.to_dict(),
+        "diagnostics": {"tracking": str(tracking_path)},
         "readiness": {
             "cache_ready_by_default": not timing.synthetic,
             "synthetic_timing": timing.synthetic,
             "solo_cfr_mvp": True,
+        },
+        "normalization": {
+            "coordinate_space": "mediapipe_image",
+            "aspect_ratio": aspect_ratio,
+            "x_z_scaled_by_aspect_ratio": True,
         },
     }
     report_path.write_text(

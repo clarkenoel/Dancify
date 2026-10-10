@@ -79,6 +79,7 @@ def validate_chart(raw: bytes) -> dict[str, Any]:
         previous_beat = value
 
     move_ids: set[str] = set()
+    previous_end = -1.0
     for move_index, move in enumerate(payload["moves"]):
         move_id = move["id"].strip()
         if not move_id:
@@ -92,6 +93,15 @@ def validate_chart(raw: bytes) -> dict[str, Any]:
         if start < 0 or end <= start or end > duration:
             raise ChartValidationError(
                 f"moves[{move_index}] must satisfy 0 <= start < end <= duration"
+            )
+        if start < previous_end:
+            raise ChartValidationError(
+                "moves must be chronological and non-overlapping"
+            )
+        previous_end = end
+        if move["is_hold"] is not False:
+            raise ChartValidationError(
+                f"moves[{move_index}].is_hold=true is not currently supported"
             )
 
         for landmark_index, landmark in enumerate(move["keyframe_landmarks"]):

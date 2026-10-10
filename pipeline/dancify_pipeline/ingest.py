@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import subprocess
 from pathlib import Path
 
@@ -54,6 +55,19 @@ def video_duration_seconds(video_path: Path) -> float:
     raise RuntimeError(f"Could not determine video duration: {video_path}")
 
 
+def video_aspect_ratio(video_path: Path) -> float:
+    """Return display width / height for aspect-aware pose normalization."""
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise RuntimeError(f"Cannot open video for dimensions: {video_path}")
+    width = float(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0.0)
+    height = float(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0.0)
+    cap.release()
+    if width <= 0 or height <= 0:
+        raise RuntimeError(f"Could not determine video dimensions: {video_path}")
+    return width / height
+
+
 def download_url(url: str, dest: Path) -> Path:
     """Download into a URL-keyed path, replacing stale prior content."""
     dest = Path(dest)
@@ -74,8 +88,19 @@ def download_url(url: str, dest: Path) -> Path:
         "mp4",
         "-o",
         out_tmpl,
-        url,
     ]
+    cookies_file = os.environ.get("DANCIFY_YTDLP_COOKIES_FILE")
+    if cookies_file:
+        cookie_path = Path(cookies_file).expanduser().resolve()
+        if not cookie_path.is_file():
+            raise RuntimeError(
+                "Configured yt-dlp cookie file is unavailable"
+            )
+        cmd.extend(["--cookies", str(cookie_path)])
+    impersonate = os.environ.get("DANCIFY_YTDLP_IMPERSONATE")
+    if impersonate:
+        cmd.extend(["--impersonate", impersonate])
+    cmd.append(url)
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         raise RuntimeError(f"yt-dlp failed:\n{proc.stderr[-2000:]}")

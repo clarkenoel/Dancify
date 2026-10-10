@@ -124,6 +124,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.song_id,
                 output,
                 audio_path=Path(result["audio"]),
+                report_path=Path(result["report"]),
                 base_url=args.api_base,
             )
             print(f"cached chart on song {args.song_id} via {args.api_base}")
