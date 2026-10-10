@@ -80,6 +80,18 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   const skeleton = page.getByRole('img', { name: 'Tracked body skeleton', exact: true });
   await expect.poll(() => skeleton.evaluate((c: HTMLCanvasElement) => c.width)).toBeGreaterThan(0);
   await expect(page.getByLabel('Camera target pose')).toBeVisible();
+  const referenceBox = await page.getByLabel('Reference video').boundingBox();
+  const webcamBox = await page.getByLabel('Webcam preview').boundingBox();
+  expect(webcamBox!.x).toBeGreaterThanOrEqual(referenceBox!.x + referenceBox!.width);
+  expect(Math.abs(webcamBox!.y - referenceBox!.y)).toBeLessThan(2);
+  await page.getByLabel('Practice video feeds').screenshot({ path: test.info().outputPath('side-by-side.png') });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const narrowReference = await page.getByLabel('Reference video').boundingBox();
+  const narrowCamera = await page.getByLabel('Webcam preview').boundingBox();
+  expect(narrowCamera!.y).toBeGreaterThan(narrowReference!.y + narrowReference!.height);
+  expect(narrowCamera!.x + narrowCamera!.width).toBeLessThanOrEqual(390);
+  await page.setViewportSize({ width: 1280, height: 720 });
+
   await page.getByRole('region', { name: 'Player camera', exact: true }).screenshot({ path: test.info().outputPath('camera-preview.png') });
   await page.getByRole('checkbox', { name: 'Show body skeleton' }).uncheck();
   await expect(page.getByRole('checkbox', { name: 'Show body skeleton' })).not.toBeChecked();

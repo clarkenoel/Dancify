@@ -31,15 +31,21 @@ export function GamePanel({ bundle, mode, outbox, onResult }: { bundle: Bundle; 
     <h2>{bundle.song.title}</h2>
     <p>{mode === 'camera' ? 'Camera scoring' : 'Keyboard practice — separate from camera scores'}</p>
     {bundle.report.cache.source_kind === 'manual' && <p>This bundle was supplied manually with a validated report; its media provenance was not verified by the preparation worker.</p>}
-    <label><input type="checkbox" checked={showTiming} onChange={e => setShowTiming(e.target.checked)} /> Show timing overlay</label>
-    <div style={{ position: 'relative', width: 640, maxWidth: '100%' }}>
-      <video ref={game.videoRef} src={bundle.videoUrl} controls playsInline preload="metadata" width="640" style={{ display: 'block', width: '100%' }} aria-label="Reference video" />
-      {showTiming && <TimingOverlay chart={bundle.chart} snapshot={s} mode={mode} />}
+    <div aria-label="Practice video feeds" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 28rem), 1fr))', gap: '1rem', alignItems: 'start', maxWidth: mode === 'camera' ? 1280 : 640 }}>
+      <section aria-label="Reference player" style={{ minWidth: 0 }}>
+        <h3>Reference dance</h3>
+        <div style={{ position: 'relative', width: '100%' }}>
+          <video ref={game.videoRef} src={bundle.videoUrl} controls playsInline preload="metadata" width="640" style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', objectFit: 'contain' }} aria-label="Reference video" />
+          {showTiming && <TimingOverlay chart={bundle.chart} snapshot={s} mode={mode} />}
+        </div>
+        <label><input type="checkbox" checked={showTiming} onChange={e => setShowTiming(e.target.checked)} /> Show timing overlay</label>
+        <p><button onClick={() => void game.toggle()}>Play / pause</button>{' '}<button onClick={replay}>Replay from beginning</button></p>
+        {game.error && <p role="alert">{game.error}</p>}
+        <p>Diamonds mark detected music beats. Pose bars mark scoring windows; press Enter during a bar in keyboard practice. Arrow keys still seek. Use this view to check the chart against the music; it does not prove beat detection is correct. Native video fullscreen hides the overlay.</p>
+      </section>
+      {mode === 'camera' && <CameraPanel camera={game.camera} target={bundle.chart.moves.find(m => m.id === (s.activeId ?? s.upcomingIds[0]))} active={s.activeId !== null} />}
     </div>
-    <p>Diamonds mark detected music beats. Pose bars mark scoring windows; press Enter during a bar in keyboard practice. Arrow keys still seek. Use this view to check the chart against the music; it does not prove beat detection is correct. Native video fullscreen hides the overlay.</p>
-    {game.error && <p role="alert">{game.error}</p>}
-    <p><button onClick={() => void game.toggle()}>Play / pause</button>{' '}<button onClick={replay}>Replay from beginning</button></p>
-    {mode === 'camera' ? <CameraPanel camera={game.camera} target={bundle.chart.moves.find(m => m.id === (s.activeId ?? s.upcomingIds[0]))} active={s.activeId !== null} /> : <p><button onClick={game.hit} disabled={!s.playing}>Hit checkpoint</button> Press Enter during a checkpoint window, or use this button.</p>}
+    {mode === 'keyboard_practice' && <p><button onClick={game.hit} disabled={!s.playing}>Hit checkpoint</button> Press Enter during a checkpoint window, or use this button.</p>}
     <p>Space: play/pause. R: replay. Left/right arrows: seek for practice. Form controls keep their normal keyboard behavior.</p>
     <p aria-label="Playback position">{s.time.toFixed(1)} / {s.duration.toFixed(1)} seconds</p>
     <p>Beat {bundle.chart.beat_times.filter(t => t <= s.time).length} / {bundle.chart.beat_times.length}</p>

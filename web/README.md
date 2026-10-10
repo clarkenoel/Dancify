@@ -196,3 +196,9 @@ Preview mirroring does not change the existing unmirrored comparison convention.
 Automated validation uses recorded dancer footage through a simulated webcam.
 A real-player trial on the demo machine is still required to complete W1's human
 acceptance gate and measure latency, framing and left/right usability.
+
+For webcam testing, camera mode places the reference video on the left and the
+mirrored player/skeleton feed on the right on wide screens. Both players retain
+their full image with letterboxing rather than cropping. On narrow screens they
+stack; native video fullscreen shows only that feed, so keep playback inline to
+compare both. Playback timing and scoring are unchanged.
