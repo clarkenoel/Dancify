@@ -7,6 +7,13 @@ from pathlib import Path
 import requests
 
 
+def _require_success(response: requests.Response, action: str) -> None:
+    if response.status_code >= 400:
+        raise RuntimeError(
+            f"{action} failed ({response.status_code}): {response.text[:2000]}"
+        )
+
+
 def upload_chart(
     song_id: str,
     chart_path: Path,
@@ -24,20 +31,21 @@ def upload_chart(
             "audio/wav",
         )
     resp = requests.put(url, files=files, timeout=60)
-    if resp.status_code >= 400:
-        raise RuntimeError(f"cache upload failed ({resp.status_code}): {resp.text}")
+    _require_success(resp, "cache upload")
     return resp.json()
 
 
 def mark_processing(song_id: str, base_url: str = "http://127.0.0.1:8000") -> None:
     url = f"{base_url.rstrip('/')}/songs/{song_id}"
-    requests.patch(url, json={"status": "processing"}, timeout=30)
+    response = requests.patch(url, json={"status": "processing"}, timeout=30)
+    _require_success(response, "mark processing")
 
 
 def mark_failed(
     song_id: str, message: str, base_url: str = "http://127.0.0.1:8000"
 ) -> None:
     url = f"{base_url.rstrip('/')}/songs/{song_id}"
-    requests.patch(
+    response = requests.patch(
         url, json={"status": "failed", "error_message": message[:2000]}, timeout=30
     )
+    _require_success(response, "mark failed")

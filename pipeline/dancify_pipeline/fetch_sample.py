@@ -21,8 +21,13 @@ TESTDATA = ROOT / "testdata"
 def try_ytdlp(url: str, dest: Path, *, impersonate: bool = False) -> Path | None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     out = dest.with_suffix("")
+    for old in dest.parent.glob(out.name + ".*"):
+        if old.is_file():
+            old.unlink()
     cmd = [
         "yt-dlp",
+        "--force-overwrites",
+        "--no-part",
         "-f",
         "b",
         "--merge-output-format",

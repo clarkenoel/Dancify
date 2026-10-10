@@ -19,9 +19,13 @@ def normalize_frame(landmarks: np.ndarray) -> np.ndarray:
     out = landmarks.astype(np.float64).copy()
     hip = 0.5 * (out[LEFT_HIP, :3] + out[RIGHT_HIP, :3])
     shoulder = 0.5 * (out[LEFT_SHOULDER, :3] + out[RIGHT_SHOULDER, :3])
+    if not np.all(np.isfinite(hip)) or not np.all(np.isfinite(shoulder)):
+        out[:, :3] = np.nan
+        return out
     torso = float(np.linalg.norm(shoulder - hip))
-    if torso < 1e-6:
-        torso = 1.0
+    if not np.isfinite(torso) or torso < 1e-6:
+        out[:, :3] = np.nan
+        return out
     out[:, :3] = (out[:, :3] - hip) / torso
     return out
 

@@ -6,14 +6,28 @@ import numpy as np
 from scipy.ndimage import uniform_filter1d
 from scipy.signal import find_peaks
 
+from .tracking import usable_keyframe
+
 
 def _smooth_energy(energy: np.ndarray, frames: int = 7) -> np.ndarray:
-    if energy.size < 3:
-        return energy.copy()
-    w = min(frames, energy.size if energy.size % 2 == 1 else energy.size - 1)
-    if w < 3:
-        return energy.copy()
-    return uniform_filter1d(energy.astype(np.float64), size=w, mode="nearest")
+    """Smooth only contiguous finite runs; preserve invalid spans as NaN."""
+    out = np.full(energy.shape, np.nan, dtype=np.float64)
+    finite = np.isfinite(energy)
+    i = 0
+    while i < len(energy):
+        if not finite[i]:
+            i += 1
+            continue
+        start = i
+        while i < len(energy) and finite[i]:
+            i += 1
+        end = i
+        run = energy[start:end].astype(np.float64)
+        w = min(frames, len(run) if len(run) % 2 == 1 else len(run) - 1)
+        out[start:end] = (
+            uniform_filter1d(run, size=w, mode="nearest") if w >= 3 else run
+        )
+    return out
 
 
 def find_energy_dips(
@@ -21,19 +35,84 @@ def find_energy_dips(
     times: np.ndarray,
     min_prominence: float | None = None,
     min_distance_frames: int = 8,
+    valid_mask: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return (dip_times, dip_frame_indices) for local minima of smoothed energy."""
     if energy.size < 3:
         return np.array([], dtype=np.float64), np.array([], dtype=np.int64)
     sm = _smooth_energy(energy)
-    inv = -sm
+    valid = np.isfinite(sm)
+    if valid_mask is not None:
+        valid &= valid_mask
+    finite_values = sm[valid]
+    if finite_values.size < 3:
+        return np.array([], dtype=np.float64), np.array([], dtype=np.int64)
     prom = min_prominence
     if prom is None:
-        prom = float(np.std(sm) * 0.4) if np.std(sm) > 0 else 0.01
-    peaks, props = find_peaks(
-        inv, distance=min_distance_frames, prominence=max(prom, 1e-4)
+        std = float(np.std(finite_values))
+        prom = std * 0.4 if std > 0 else 0.01
+
+    found: list[int] = []
+    i = 0
+    while i < len(sm):
+        if not valid[i]:
+            i += 1
+            continue
+        start = i
+        while i < len(sm) and valid[i]:
+            i += 1
+        end = i
+        if end - start < 3:
+            continue
+        peaks, _ = find_peaks(
+            -sm[start:end],
+            distance=min_distance_frames,
+            prominence=max(float(prom), 1e-4),
+        )
+        found.extend((peaks + start).astype(int).tolist())
+    indices = np.asarray(found, dtype=np.int64)
+    return times[indices], indices
+
+
+def _usable_motion(energy: np.ndarray, valid: np.ndarray) -> bool:
+    values = energy[valid & np.isfinite(energy)]
+    if values.size < 5:
+        return False
+    spread = float(np.percentile(values, 95) - np.percentile(values, 5))
+    return np.isfinite(spread) and spread > 1e-4
+
+
+def _fallback_hits(
+    smoothed_energy: np.ndarray,
+    times: np.ndarray,
+    beat_times: list[float],
+    duration: float,
+    valid: np.ndarray,
+    beat_period: float,
+    target_beats_per_hit: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Use local valid valleys every N whole beats, never half-grid slots."""
+    beats = np.asarray(beat_times, dtype=np.float64)
+    beats = beats[(beats >= 0.2) & (beats <= max(duration - 0.2, 0.2))]
+    step = max(1, int(round(target_beats_per_hit)))
+    snap_win = 0.35 * beat_period
+    chosen: list[tuple[float, int]] = []
+    for beat in beats[::step]:
+        mask = (
+            valid
+            & np.isfinite(smoothed_energy)
+            & (times >= beat - snap_win)
+            & (times <= beat + snap_win)
+        )
+        idxs = np.flatnonzero(mask)
+        if idxs.size == 0:
+            continue
+        key_idx = int(idxs[int(np.argmin(smoothed_energy[idxs]))])
+        chosen.append((float(beat), key_idx))
+    return (
+        np.asarray([item[0] for item in chosen], dtype=np.float64),
+        np.asarray([item[1] for item in chosen], dtype=np.int64),
     )
-    return times[peaks], peaks.astype(np.int64)
 
 
 def beat_grid(beat_times: list[float], half_beats: bool = True) -> np.ndarray:
@@ -70,6 +149,7 @@ def select_musical_hits(
     duration: float,
     bpm: float,
     target_beats_per_hit: float = 2.0,
+    frame_valid: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Valley-first JD calibration.
 
@@ -89,14 +169,26 @@ def select_musical_hits(
     if grid.size == 0:
         return np.array([], dtype=np.float64), np.array([], dtype=np.int64)
 
+    valid = np.isfinite(energy)
+    if frame_valid is not None:
+        valid &= frame_valid
+    if not _usable_motion(energy, valid):
+        return np.array([], dtype=np.float64), np.array([], dtype=np.int64)
+
     sm = _smooth_energy(energy)
-    dip_times, dip_idxs = find_energy_dips(energy, times)
+    dip_times, dip_idxs = find_energy_dips(
+        energy, times, valid_mask=valid
+    )
     if dip_times.size == 0:
-        # Fallback: sample every Nth beat with local valley search
-        step = max(1, int(round(target_beats_per_hit)))
-        hits = grid[::step]
-        kfi = np.array([int(np.argmin(np.abs(times - h))) for h in hits], dtype=np.int64)
-        return hits.astype(np.float64), kfi
+        return _fallback_hits(
+            sm,
+            times,
+            beat_times,
+            duration,
+            valid,
+            beat_period,
+            target_beats_per_hit,
+        )
 
     candidates: list[tuple[float, int, float]] = []  # (grid_t, valley_frame, score)
     used_grid: set[float] = set()
@@ -108,12 +200,20 @@ def select_musical_hits(
         # Valley depth: neighbors higher than valley
         lo = max(0, di - 4)
         hi = min(len(sm) - 1, di + 4)
-        neigh = np.concatenate([sm[lo:di], sm[di + 1 : hi + 1]]) if hi > lo else sm[di : di + 1]
+        neigh = (
+            np.concatenate([sm[lo:di], sm[di + 1 : hi + 1]])
+            if hi > lo
+            else sm[di : di + 1]
+        )
+        neigh = neigh[np.isfinite(neigh)]
         depth = float(np.mean(neigh) - sm[di]) if neigh.size else 0.0
         if depth <= 0:
             continue
         # Prefer tighter snap + deeper valley; energy at grid shouldn't be a peak
-        gi = int(np.argmin(np.abs(times - g)))
+        valid_idxs = np.flatnonzero(valid & np.isfinite(sm))
+        if valid_idxs.size == 0:
+            continue
+        gi = int(valid_idxs[int(np.argmin(np.abs(times[valid_idxs] - g)))])
         at_grid = float(sm[gi])
         # Penalize if beat sits on a high-energy slope/peak vs valley
         peak_pen = max(0.0, at_grid - sm[di])
@@ -132,10 +232,15 @@ def select_musical_hits(
             candidates.append((g, int(di), score))
 
     if not candidates:
-        step = max(1, int(round(target_beats_per_hit)))
-        hits = grid[::step][: max(4, int(duration))]
-        kfi = np.array([int(np.argmin(np.abs(times - h))) for h in hits], dtype=np.int64)
-        return np.asarray(hits, dtype=np.float64), kfi
+        return _fallback_hits(
+            sm,
+            times,
+            beat_times,
+            duration,
+            valid,
+            beat_period,
+            target_beats_per_hit,
+        )
 
     # Sort by score descending; greedy min-gap
     candidates.sort(key=lambda x: -x[2])
@@ -158,7 +263,12 @@ def select_musical_hits(
         for g in grid:
             if any(abs(g - c[0]) < min_gap for c in chosen):
                 continue
-            mask = (times >= g - snap_win) & (times <= g + snap_win)
+            mask = (
+                valid
+                & np.isfinite(sm)
+                & (times >= g - snap_win)
+                & (times <= g + snap_win)
+            )
             if not np.any(mask):
                 continue
             idxs = np.where(mask)[0]
@@ -180,16 +290,28 @@ def build_moves(
     duration: float,
     keyframe_indices: np.ndarray | None = None,
     window: float = 0.5,
+    frame_valid: np.ndarray | None = None,
 ) -> list[dict]:
     """One keyframe pose per hit; windows centered on hit time (JD pictogram moment)."""
     moves: list[dict] = []
-    hits = list(hit_times)
-    for i, t in enumerate(hits):
+    selected: list[tuple[float, int]] = []
+    for i, t in enumerate(hit_times):
+        if keyframe_indices is not None and i < len(keyframe_indices):
+            fi = int(np.clip(keyframe_indices[i], 0, len(frames) - 1))
+        else:
+            fi = int(np.argmin(np.abs(times - t)))
+        if frame_valid is not None and not bool(frame_valid[fi]):
+            continue
+        if not usable_keyframe(frames[fi]):
+            continue
+        selected.append((float(t), fi))
+
+    for i, (t, fi) in enumerate(selected):
         # Center the judgment window on the musical hit (red marker)
         start = max(0.0, float(t) - window * 0.5)
         end = min(duration, float(t) + window * 0.5)
-        if i + 1 < len(hits):
-            mid = (float(t) + float(hits[i + 1])) / 2.0
+        if i + 1 < len(selected):
+            mid = (float(t) + selected[i + 1][0]) / 2.0
             end = min(end, mid)
         if i > 0:
             prev_end = moves[-1]["end"]
@@ -201,11 +323,6 @@ def build_moves(
             if i > 0 and start < moves[-1]["end"]:
                 start = moves[-1]["end"]
 
-        if keyframe_indices is not None and i < len(keyframe_indices):
-            fi = int(keyframe_indices[i])
-            fi = max(0, min(fi, len(frames) - 1))
-        else:
-            fi = int(np.argmin(np.abs(times - t)))
         key = frames[fi]
         moves.append(
             {

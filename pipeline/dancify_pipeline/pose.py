@@ -8,16 +8,21 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
+from .tracking import frame_confidence, frame_tracking_mask
+
 
 def extract_poses(
     video_path: Path,
     target_fps: float = 30.0,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Return (timestamps_sec [T], landmarks [T,33,4]).
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Return timestamps, landmarks, frame-valid mask, and confidence.
 
-    Primary subject: MediaPipe Pose returns one body; for multi-person we keep
-    the single detected pose (solo MVP). Portrait and landscape both supported.
+    This is deliberately a solo-subject MVP. Inputs with multiple people are
+    unsupported; downstream continuity gates reject unstable tracking.
     """
+    if not np.isfinite(target_fps) or target_fps <= 0:
+        raise ValueError("target_fps must be a finite positive number")
+
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise RuntimeError(f"Cannot open video: {video_path}")
@@ -44,10 +49,12 @@ def extract_poses(
             if idx % frame_interval != 0:
                 idx += 1
                 continue
-            t = idx / src_fps
+            pts = float(cap.get(cv2.CAP_PROP_POS_MSEC)) / 1000.0
+            t = pts if np.isfinite(pts) and pts > 0 else idx / src_fps
             rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
             result = pose.process(rgb)
-            lm = np.zeros((33, 4), dtype=np.float64)
+            lm = np.full((33, 4), np.nan, dtype=np.float64)
+            lm[:, 3] = 0.0
             if result.pose_landmarks:
                 for i, p in enumerate(result.pose_landmarks.landmark):
                     lm[i] = [p.x, p.y, p.z, p.visibility]
@@ -58,4 +65,11 @@ def extract_poses(
     cap.release()
     if not frames:
         raise RuntimeError("No frames read from video")
-    return np.asarray(times, dtype=np.float64), np.stack(frames, axis=0)
+    timestamps = np.asarray(times, dtype=np.float64)
+    landmarks = np.stack(frames, axis=0)
+    return (
+        timestamps,
+        landmarks,
+        frame_tracking_mask(landmarks),
+        frame_confidence(landmarks),
+    )
