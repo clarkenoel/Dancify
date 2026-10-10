@@ -79,6 +79,23 @@ curl -s -X POST http://127.0.0.1:8000/songs/<SONG_ID>/plays \
 
 Pipeline tip: `PATCH` status to `processing` when you start, `PUT /chart` on success, or `PATCH` `status=failed` + `error_message` on failure.
 
+## Bake demo songs (no re-run)
+
+After charts exist under `pipeline/outputs/`:
+
+```bash
+# terminal A
+cd backend && source .venv/bin/activate
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# terminal B (repo root)
+python3 backend/scripts/bake_demo_songs.py
+# or: bash backend/scripts/bake_demo_songs.sh
+```
+
+Seeds **Charli LISA**, **Vegas solo**, and optional **JD Video_1** as `status=ready`.
+Manifest: `backend/data/demo_seed_manifest.json` (gitignored).
+
 ## Env / config
 
 None required. Optional later: point `DATA_DIR` elsewhere by editing `app/paths.py`. CORS is open (`*`) for local web.
