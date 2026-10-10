@@ -19,7 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .chart_validation import ChartValidationError, validate_chart
+from .chart_validation import ChartSyntaxError, ChartValidationError, validate_chart
 from .db import SessionLocal, get_db, init_db
 from .models import Play, Song, utcnow
 from .paths import (
@@ -488,8 +488,10 @@ async def upload_chart(
             payload = validate_chart(raw_chart)
         except UploadTooLargeError as exc:
             raise HTTPException(status_code=413, detail=str(exc)) from exc
-        except (EmptyUploadError, ChartValidationError) as exc:
+        except (EmptyUploadError, ChartSyntaxError) as exc:
             raise HTTPException(status_code=400, detail=f"Invalid chart: {exc}") from exc
+        except ChartValidationError as exc:
+            raise HTTPException(status_code=422, detail=f"Invalid chart: {exc}") from exc
 
         folder = song_dir(song_id)
         generation = uuid.uuid4().hex

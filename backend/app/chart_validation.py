@@ -9,8 +9,17 @@ from jsonschema import Draft7Validator
 
 from .paths import CHART_SCHEMA_PATH
 
+VISIBILITY_THRESHOLD = 0.35
+MIN_VISIBLE_JOINTS = 6
+NONZERO_TOLERANCE = 1e-8
+SCORE_LANDMARK_INDEXES = (11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28)
+
 
 class ChartValidationError(ValueError):
+    pass
+
+
+class ChartSyntaxError(ChartValidationError):
     pass
 
 
@@ -36,7 +45,7 @@ def validate_chart(raw: bytes) -> dict[str, Any]:
     try:
         payload = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
-        raise ChartValidationError(f"Invalid JSON: {exc}") from exc
+        raise ChartSyntaxError(f"Invalid JSON: {exc}") from exc
 
     errors = sorted(
         _validator().iter_errors(payload),
@@ -100,5 +109,27 @@ def validate_chart(raw: bytes) -> dict[str, Any]:
                     f"[{move_index}].keyframe_landmarks"
                     f"[{landmark_index}][3] must be between zero and one"
                 )
+
+        visible_indexes = [
+            index
+            for index in SCORE_LANDMARK_INDEXES
+            if float(move["keyframe_landmarks"][index][3]) >= VISIBILITY_THRESHOLD
+        ]
+        if len(visible_indexes) < MIN_VISIBLE_JOINTS:
+            raise ChartValidationError(
+                f"moves[{move_index}] needs at least {MIN_VISIBLE_JOINTS} "
+                f"gameplay joints with visibility >= {VISIBILITY_THRESHOLD}"
+            )
+        visible_geometry = (
+            move["keyframe_landmarks"][index][:3] for index in visible_indexes
+        )
+        if all(
+            abs(float(coordinate)) <= NONZERO_TOLERANCE
+            for landmark in visible_geometry
+            for coordinate in landmark
+        ):
+            raise ChartValidationError(
+                f"moves[{move_index}] has no usable nonzero visible pose geometry"
+            )
 
     return payload

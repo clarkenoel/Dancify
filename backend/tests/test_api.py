@@ -14,6 +14,28 @@ from app.paths import SONGS_DIR
 
 VIDEO = b"0123456789-reference-video"
 AUDIO = b"abcdefghij-audio"
+GAMEPLAY_JOINTS = (11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28)
+
+
+def valid_normalized_pose() -> list[list[float]]:
+    pose = [[0.0, 0.0, 0.0, 0.1] for _ in range(33)]
+    geometry = {
+        11: (-0.5, -1.0, 0.0),
+        12: (0.5, -1.0, 0.0),
+        13: (-0.8, -0.5, 0.0),
+        14: (0.8, -0.5, 0.0),
+        15: (-1.0, 0.0, 0.0),
+        16: (1.0, 0.0, 0.0),
+        23: (-0.25, 0.0, 0.0),
+        24: (0.25, 0.0, 0.0),
+        25: (-0.3, 0.8, 0.0),
+        26: (0.3, 0.8, 0.0),
+        27: (-0.3, 1.6, 0.0),
+        28: (0.3, 1.6, 0.0),
+    }
+    for index, coordinates in geometry.items():
+        pose[index] = [*coordinates, 0.95]
+    return pose
 
 
 def chart(*, bpm: float = 120, move_id: str = "m0") -> dict[str, object]:
@@ -27,7 +49,7 @@ def chart(*, bpm: float = 120, move_id: str = "m0") -> dict[str, object]:
                 "id": move_id,
                 "start": 1.0,
                 "end": 2.0,
-                "keyframe_landmarks": [[0.0, 0.0, 0.0, 1.0]] * 33,
+                "keyframe_landmarks": valid_normalized_pose(),
                 "is_hold": False,
             }
         ],
@@ -103,12 +125,62 @@ def test_invalid_chart_never_overwrites_ready_cache(
         audio=b"replacement-audio",
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 422
     assert client.get(f"/songs/{song_id}/chart").content == old_chart
     assert client.get(f"/songs/{song_id}/audio").content == old_audio
     detail = client.get(f"/songs/{song_id}").json()
     assert detail["status"] == "ready"
     assert detail["bpm"] == 120
+
+
+@pytest.mark.parametrize("failure", ["all-zero", "low-visibility"])
+def test_unusable_pose_cannot_create_or_overwrite_ready_cache(
+    client: TestClient, failure: str
+) -> None:
+    invalid = chart()
+    if failure == "all-zero":
+        landmarks = [[0.0, 0.0, 0.0, 1.0] for _ in range(33)]
+    else:
+        landmarks = valid_normalized_pose()
+        for index in GAMEPLAY_JOINTS:
+            landmarks[index][3] = 0.34
+    invalid["moves"][0]["keyframe_landmarks"] = landmarks  # type: ignore[index]
+
+    song = create_song(client)
+    song_id = str(song["id"])
+    rejected_initial = upload_bundle(client, song_id, payload=invalid)
+    assert rejected_initial.status_code == 422
+    pending = client.get(f"/songs/{song_id}").json()
+    assert pending["status"] == "pending"
+    assert pending["has_chart"] is False
+    assert pending["has_audio"] is False
+    assert not list((SONGS_DIR / song_id).glob("bundle-*"))
+
+    valid = upload_bundle(client, song_id)
+    assert valid.status_code == 200
+    old_chart = client.get(f"/songs/{song_id}/chart").content
+    old_audio = client.get(f"/songs/{song_id}/audio").content
+
+    rejected_replacement = upload_bundle(
+        client,
+        song_id,
+        payload=invalid,
+        audio=b"invalid-replacement-audio",
+    )
+    assert rejected_replacement.status_code == 422
+    assert client.get(f"/songs/{song_id}/chart").content == old_chart
+    assert client.get(f"/songs/{song_id}/audio").content == old_audio
+    assert client.get(f"/songs/{song_id}").json()["status"] == "ready"
+
+
+def test_valid_normalized_pose_is_accepted(client: TestClient) -> None:
+    song = create_song(client)
+    response = upload_bundle(client, str(song["id"]), payload=chart())
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
+    stored = client.get(f"/songs/{song['id']}/chart").json()
+    assert stored["moves"][0]["keyframe_landmarks"] == valid_normalized_pose()
 
 
 def test_ready_requires_reference_video_chart_and_audio(client: TestClient) -> None:
