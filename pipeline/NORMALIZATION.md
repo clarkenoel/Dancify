@@ -24,5 +24,5 @@ long gaps remain invalid and are excluded from smoothing, energy, and hits.
 All-zero or low-visibility keyframes are rejected.
 
 Timeline: all `beat_times`, move `start`/`end`, and extracted audio are on the
-zero-based video master timeline—the same clock exposed by
-`HTMLMediaElement.currentTime`.
+zero-based reference-video timeline. Gameplay reads the reference
+`HTMLVideoElement.currentTime` as its sole master clock.

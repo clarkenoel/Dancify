@@ -6,8 +6,8 @@ You are working on the prep pipeline only. Person A owns this directory.
 
 - Python only in this directory. Person A also owns `/backend` (local FastAPI + SQLite song cache).
 - Do not touch `/web`, `/firmware`, or `/schema`.
-- Output must match `dance.schema.json` exactly.
-- After a successful run, cache the chart via `PUT /songs/{id}/chart` on the song-cache API so the game can skip recompute (see `backend/README.md` and `PRD.md` §7).
+- Output must match `schema/dance.schema.json.json` exactly.
+- After a successful run, cache the chart via `PUT /songs/{id}/chart` on the song-cache API so the game can skip recompute (see `backend/README.md` and `PRD.md.md` §7).
 - Cache only when the run report says `cache_ready_by_default=true`; synthetic
   timing requires explicit human override.
 
@@ -31,4 +31,5 @@ You are working on the prep pipeline only. Person A owns this directory.
 
 ## Session Start
 
-Confirm you are in `/pipeline`. Read `PRD.md` §4.1 for the full pipeline spec.
+Confirm you are in `/pipeline`. Read `PRD.md.md` §4.1 for the target pipeline
+and `pipeline/README.md` for the shipped MVP boundary.

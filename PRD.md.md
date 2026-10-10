@@ -5,6 +5,12 @@
 **Owner:** [Your name]
 **Status:** Active development — 48-hour hackathon build
 
+This document describes the product vision and target architecture. The shipped
+prep implementation is a narrower hackathon MVP: short, stable, solo-dancer CFR
+clips only. Multi-person identity isolation, angular-velocity energy, and hold
+merging are explicitly deferred. See `pipeline/README.md` and
+`pipeline/CALIBRATION.md` for the implemented contract.
+
 ---
 
 ## 1. One-Line Summary
@@ -37,20 +43,21 @@ Three independent pieces plus one shared contract layer.
 
 ### 4.1 The Prep Pipeline (Python, offline, runs once per video)
 
-**Input:** a video file (any length, any source, front-facing, single dancer preferred).
+**Target input:** a video file from a local path or supported URL.
+**Shipped MVP input:** a short, stable, front-facing solo-dancer CFR clip.
 **Output:** a `dance.json` file plus cached audio and any pictogram assets.
 
-**Stages:**
+**Target stages** (deferred items are marked):
 1. Download or ingest video (local file or URL via `yt-dlp`).
 2. Extract audio with `ffmpeg`.
 3. Run `librosa.beat.beat_track()` for BPM and beat times.
 4. Sample video at 30fps, run MediaPipe Pose on each frame → 33 landmarks per frame.
-5. **Primary subject isolation:** for multi-person frames, keep only the highest-confidence / largest bounding box. Must track the correct person across the full video, not switch frame to frame.
-6. **Joint smoothing:** Savitzky-Golay filter, tune window/poly per video resolution. Must reduce jitter without lagging fast motion.
-7. Compute per-frame **motion energy** (weighted mean joint angular velocity; arms > legs > face).
+5. **Deferred — primary subject isolation:** for multi-person frames, keep only the highest-confidence / largest bounding box and track the same person.
+6. **Joint smoothing:** the MVP uses Savitzky-Golay smoothing; per-resolution tuning remains target work.
+7. Compute per-frame **motion energy**. The MVP uses confidence-masked normalized landmark speed; weighted joint angular velocity remains deferred.
 8. Find **dips** in the motion-energy curve — these are held poses, the hit moments.
 9. Snap each dip to the nearest beat or half-beat.
-10. Merge consecutive hits with similar target poses (a 4-beat hold = 1 hit with a hold bar, not 4 hits).
+10. **Deferred — hold merging:** merge consecutive hits with similar target poses (a 4-beat hold = 1 hit with a hold bar, not 4 hits).
 11. Write `dance.json`.
 
 **Required tooling:** a velocity-curve debug view showing the motion-energy curve, beat grid, and detected hit markers. If markers don't sit in the dips and on the grid, the pipeline is wrong. This is not optional — it's the only way to diagnose the pipeline.
@@ -62,11 +69,11 @@ Three independent pieces plus one shared contract layer.
 **Stack:** TypeScript, React, Canvas 2D, `@mediapipe/tasks-vision`, Web Bluetooth API.
 
 **Runtime flow:**
-1. Load `dance.json` and the audio file.
+1. Load the reference video, `dance.json`, and aligned audio sidecar bundle.
 2. Turn on webcam, run MediaPipe PoseLandmarker on the live feed (GPU delegate).
-3. **Master clock = `video.currentTime`** (not `performance.now()`, not `AudioContext`).
+3. **Master clock = the reference `<video>` element's `currentTime`** (not `performance.now()`, not `AudioContext`, and not a separate audio element).
 4. On each frame:
-   - Read `t = video.currentTime`.
+   - Read `t = referenceVideo.currentTime`.
    - Find the active move (hit moment whose window contains `t`).
    - Interpolate the target pose.
    - Compare the player's pose to the target.
@@ -128,7 +135,7 @@ Three independent pieces plus one shared contract layer.
 
 ## 5. Shared Contracts (FROZEN — Do Not Change Without Announcement)
 
-### 5.1 `dance.schema.json`
+### 5.1 `schema/dance.schema.json.json`
 
 ```json
 {
@@ -148,7 +155,9 @@ Three independent pieces plus one shared contract layer.
 }
 ```
 
-Landmarks are normalized to hip-center origin and torso-length scale.
+The landmark array above is abbreviated for readability; the frozen schema
+requires exactly 33 `[x, y, z, visibility]` tuples. Landmarks are normalized to
+hip-center origin and torso-length scale.
 
 ### 5.2 `wearable.protocol.md`
 
@@ -169,15 +178,15 @@ All messages UTF-8 strings, newline-terminated optional.
 ```
 /
   schema/
-    dance.schema.json       ← FROZEN
-    types.ts                ← FROZEN
+    dance.schema.json.json  ← FROZEN (legacy double extension)
+    type.ts                 ← FROZEN
     wearable.protocol.md    ← FROZEN
   pipeline/                 ← Person A only
   backend/                  ← Person A (song/chart cache API; web consumes it)
   web/                      ← Person B only
   firmware/                 ← Person C only
   assets/pictograms/        ← Artist only
-  docs/demo-script.md       ← Integrator only
+  docs/handoffs/            ← Integrator only
 ```
 
 **Ownership rules:**
@@ -221,7 +230,9 @@ State explicitly so no one wastes time:
 - **No cloud backend / no auth product.** Do not build user accounts, OAuth, cloud GPU inference, or paid API-key services. The **local** FastAPI + SQLite song cache in `/backend` is allowed and expected — it only stores songs, cached charts, and play history.
 - **No IMU.** The wearable doesn't score.
 - **No motion capture suit, no depth camera, no cloud inference.**
-- **No glowing hand overlay on the reference video.** The prep pipeline isolates the primary subject; there's only one dancer to follow.
+- **No glowing hand overlay on the reference video.** The shipped MVP requires
+  one continuously visible dancer; target multi-person isolation remains
+  deferred.
 
 ---
 
@@ -258,9 +269,9 @@ This de-risks the pipeline by making the user responsible for choosing a clean i
 
 ### Phase 0 — Foundation (H0–2)
 
-- Freeze `dance.schema.json` and `wearable.protocol.md`.
+- Freeze `schema/dance.schema.json.json`, `schema/type.ts`, and `schema/wearable.protocol.md`.
 - Scaffold repo directories.
-- Commit `PRD.md`.
+- Commit `PRD.md.md`.
 - Everyone pushes one trivial commit to their branch.
 - **Gate:** contracts frozen, everyone committed.
 
@@ -271,14 +282,15 @@ This de-risks the pipeline by making the user responsible for choosing a clean i
 **Person A — Prep pipeline:**
 - `video → ffmpeg → librosa beats → MediaPipe poses → smoothing → motion energy → hit moments → dance.json`.
 - Joint smoothing: Savitzky-Golay, tune per resolution.
-- Primary subject isolation: highest-confidence / largest bounding box, stable across full video.
+- Target/deferred: primary subject isolation across multi-person video.
+- MVP boundary: reject unstable tracking and accept stable solo CFR clips only.
 - Velocity-curve debug view (non-negotiable).
 - Raw-vs-smoothed overlay view.
-- Run on 3 test videos: solo, portrait, multi-person.
+- Run the MVP on solo/portrait clips; retain multi-person validation as a future gate.
 
 **Person B — Game frontend:**
 - React scaffold, fake `dance.json`, MediaPipe PoseLandmarker on webcam, skeleton render.
-- Master clock = `video.currentTime`.
+- Master clock = the reference `<video>` element's `currentTime`.
 - Pictogram queue with hardcoded pictograms.
 - Pose comparison returning `null` for insufficient data.
 - Build `WearableClient.ts` against a **fake event source**. Interface defined, transport stubbed.
@@ -292,10 +304,10 @@ This de-risks the pipeline by making the user responsible for choosing a clean i
 - 15 SVG parts (canonical pivot, 100-unit length).
 - 4–6 hero pictograms for the demo song.
 
-**Gates (all must pass before Phase 2):**
+**Target gates** (not all are claimed by the shipped solo/CFR MVP):
 1. A's pipeline produces a correct `dance.json` for 3 videos, verified in the debug view.
 2. Joint smoothing visibly reduces jitter without lagging fast motion (raw vs. smoothed side-by-side).
-3. Primary subject isolation tracks the correct person across the full duration of a multi-person clip.
+3. Deferred: primary subject isolation tracks the correct person across the full duration of a multi-person clip.
 4. B's game runs on a real webcam with MediaPipe WASM in Chrome. No crash. Skeleton renders.
 5. C's test harness documents at least 5 known MediaPipe failure modes with symptoms.
 

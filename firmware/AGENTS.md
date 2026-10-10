@@ -17,4 +17,4 @@ You are working on the ESP32 wearable only. Person C owns this directory.
 
 ## Session Start
 
-Confirm you are in `/firmware`. Read `PRD.md` §4.3 for the firmware spec.
+Confirm you are in `/firmware`. Read `PRD.md.md` §4.3 for the firmware spec.
