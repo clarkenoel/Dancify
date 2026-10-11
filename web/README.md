@@ -477,3 +477,13 @@ strip; replay/seek reset it. Reduced motion shows a stationary current/next row.
 The artist rig and rink tokens are reused; overlay dimensions are provisional
 demo styling approved in chat, not measured from a new Figma frame. The duplicate
 static camera target is removed. Manual Start and upper-body demo scoring remain.
+
+## Temporary promotional results override (2026-10-11)
+
+User-requested promo capture mode is enabled by `PROMO_FIVE_STAR_RESULTS` in
+`src/components/GamePanel.tsx`. Every completed round displays five stars and
+uses the existing milestone-then-win result audio, including rounds with zero
+accuracy, no tracking, or a practice seek. Unfinished rounds still have no rating.
+Raw points, accuracy, tracking, judgments and persisted results remain measured;
+the override only controls the result stars and celebration. Set the constant
+to `false` after recording to restore the usual rating eligibility and thresholds.

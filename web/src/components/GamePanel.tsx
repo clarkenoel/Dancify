@@ -14,6 +14,10 @@ import { starRating } from '../core/starRating';
 import type { SoundEvent } from '../audio/SoundEffects';
 import { ScoreStars } from './RinkArtwork';
 
+// Temporary promotional capture override, requested 2026-10-11.
+// Set false to restore measured star ratings; scores and saved results stay real.
+const PROMO_FIVE_STAR_RESULTS = true;
+
 export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onResult, onChooseSong, onMainMenu }: { bundle: Bundle; wearable: WearableClient; outbox: ResultOutbox; onSound: (event: SoundEvent, id?: string) => void; onStopSounds: () => void; onResult: () => void; onChooseSong: () => void; onMainMenu: () => void; }) {
   const [confirmation, setConfirmation] = useState<'restart' | 'library' | 'main' | null>(null);
   const [tools, setTools] = useState<'settings' | 'developer' | null>(null);
@@ -21,7 +25,7 @@ export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onR
   const game = useGame(bundle, wearable, confirmation !== null || tools !== null);
   const openTools = (screen: 'settings' | 'developer') => { game.pause(); setTools(screen); };
   const s = game.snapshot;
-  const finalStars = starRating(s.accuracy, s.ended, s.seeked);
+  const finalStars = PROMO_FIVE_STAR_RESULTS && s.ended ? 5 : starRating(s.accuracy, s.ended, s.seeked);
   const [volume, setVolume] = useState(1);
   const confirm = (action: 'restart' | 'library' | 'main') => { game.pause(); setConfirmation(action); };
   const [showTargetSkeleton, setShowTargetSkeleton] = useState(false);
