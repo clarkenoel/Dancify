@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('start', 'setup')][string]$Mode = 'start',
+    [ValidateSet('start', 'setup', 'demo')][string]$Mode = 'start',
     [switch]$ResetConfig
 )
 $ErrorActionPreference = 'Stop'
@@ -51,7 +51,7 @@ __ACTION__
     $config | ConvertTo-Json | Set-Content -LiteralPath $configPath -Encoding UTF8
     Write-Host "Dancify: $($config.distribution) / $($config.repository)"
     # Stream output directly; do not capture the running supervisor's output.
-    $action = if ($Mode -eq 'setup') { 'exec bash scripts/setup.sh' } else { 'exec bash scripts/start.sh' }
+    $action = if ($Mode -eq 'setup') { 'exec bash scripts/setup.sh' } elseif ($Mode -eq 'demo') { 'exec python3 scripts/demo.py' } else { 'exec bash scripts/start.sh' }
     $body = $script.Replace('__REPO__', $repoEncoded).Replace('__ACTION__', $action)
     $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($body.Replace("`r", '')))
     & wsl.exe --distribution $config.distribution --exec bash -lc "printf '%s' '$encoded' | base64 -d | bash"

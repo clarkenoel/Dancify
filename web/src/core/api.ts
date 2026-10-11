@@ -31,9 +31,11 @@ export class DancifyApi {
       const detail = typeof body?.detail === 'string' ? body.detail : `Request failed (${response.status})`;
       throw new ApiError(response.status, detail);
     }
+    if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
   }
   listSongs(signal?: AbortSignal) { return this.request<Song[]>('/songs', { signal }); }
+  deleteSong(id: string) { return this.request<void>(`/songs/${encodeURIComponent(id)}`, { method: 'DELETE' }); }
   song(id: string, signal?: AbortSignal) { return this.request<Song>(`/songs/${encodeURIComponent(id)}`, { signal }); }
   private json(method: string, body: unknown, signal?: AbortSignal): RequestInit {
     return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal };

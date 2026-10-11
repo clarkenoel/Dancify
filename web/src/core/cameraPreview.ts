@@ -41,8 +41,8 @@ export function paintCameraPreview(canvas: HTMLCanvasElement, frame: HTMLCanvasE
 
 export function cameraErrorMessage(error: unknown): string {
   const name = error instanceof Error ? error.name : '';
-  if (name === 'NotAllowedError' || name === 'SecurityError') return 'Camera permission was denied. Allow camera access in your browser site settings, then try again. Keyboard practice is available.';
+  if (name === 'NotAllowedError' || name === 'SecurityError') return 'Camera permission was denied. Allow camera access in your browser site settings, then try again. Camera access is required to play.';
   if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'The selected camera is unavailable. Refresh the camera list and choose another camera.';
   if (name === 'NotReadableError') return 'The camera could not be opened. Close other apps using it, then try again.';
-  return error instanceof Error ? error.message : 'Camera access failed. Try again or use keyboard practice.';
+  return error instanceof Error ? error.message : 'Camera access failed. Check camera access and try again.';
 }

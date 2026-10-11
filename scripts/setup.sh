@@ -3,8 +3,14 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 mkdir -p .launcher
-exec 9>.launcher/launcher.lock
-if ! flock -n 9; then
+if [[ -n "${DANCIFY_SETUP_LOCK_FD:-}" ]]; then
+  # demo.py passes an already-locked open file description to this subprocess.
+  lock_fd="$DANCIFY_SETUP_LOCK_FD"
+else
+  exec 9>.launcher/launcher.lock
+  lock_fd=9
+fi
+if ! flock -n "$lock_fd"; then
   echo 'Close the running launcher/setup before installing dependencies.' >&2
   exit 1
 fi

@@ -1,0 +1,13 @@
+BUZZER SOFTWARE BENCH - production FeedbackEngine and LineDecoder
+Simulated microsecond clock; no physical GPIO or sound measurement.
+
+60 BPM: 500.000 ms ON; 1500.000 ms ON; 2500.000 ms ON; PASS (1000000 us intervals, 40000 us pulse widths)
+120 BPM: 500.000 ms ON; 1000.000 ms ON; 1500.000 ms ON; 2000.000 ms ON; 2500.000 ms ON; PASS (500000 us intervals, 40000 us pulse widths)
+180 BPM: 500.000 ms ON; 833.333 ms ON; 1166.666 ms ON; 1499.999 ms ON; 1833.332 ms ON; 2166.665 ms ON; 2499.998 ms ON; PASS (333333 us intervals, 40000 us pulse widths)
+STOP during pulse: PASS (silent at same simulated timestamp, no later beats)
+HIT: PASS (ON 0-20 ms, 40-60 ms, 80-100 ms)
+HIT while stopped: PASS (silent)
+Menu tone: PASS (80 ms ON; active buzzer pitch is fixed by hardware)
+Missing SYNC: PASS (stops at 15 s; stale restart rejected)
+
+PASS: all buzzer software bench checks.

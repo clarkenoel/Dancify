@@ -36,7 +36,7 @@ Existing data in `backend/data/` was preserved.
 
 ## Workflow
 
-1. Enter a URL or upload a video containing the intended music. Optional start/end
+1. From Main menu, choose Import video. Enter a URL or upload a video containing the intended music. Optional start/end
    times select choreography without intros/end cards.
 2. Create and prepare. The durable worker exposes stages and actionable failures.
    The browser remembers the last job across reloads. A download error offers
@@ -44,7 +44,7 @@ Existing data in `backend/data/` was preserved.
 3. Select a ready song. The loader validates its chart and report, then pins one
    immutable bundle for the whole game. A replacement does not change that session.
    Old charts without aspect-aware normalization metadata require regeneration.
-4. Use keyboard practice, or select camera scoring and enable the camera. All
+4. Enable the camera and grant permission; camera tracking is required. All
    camera frames remain local. The preview is mirrored; inference is unmirrored.
 5. Play the reference video. Its embedded audio and `currentTime` own playback.
    No separate audio element runs. At video end the final score is shown immediately,
@@ -54,13 +54,13 @@ Existing data in `backend/data/` was preserved.
    navigation. Failed requests remain in the existing pending outbox when local
    storage is available; the main menu exposes its diagnostic retry controls.
 
-Keyboard: Space toggles playback, R replays, left/right seek, and Enter hits a
-checkpoint in keyboard practice. Inputs/buttons retain normal keyboard behavior.
-The on-screen hit button also supports keyboard practice. Simulated wearable
-events control ordered menu focus/selection and playback; they never award points.
+Keyboard arrows/Tab and Enter operate menus and native buttons only. Keyboard
+practice, Enter-to-score, the hit button, and global Space/R/seek shortcuts are
+removed. Simulated wearable events control menu focus/selection and playback;
+they never award points. A camera is required even without a controller.
 
 Seeking starts an unrecordable practice segment. Replay from the beginning to
-record a complete result. Changing mode or song resets the session and stops the
+record a complete result. Changing song resets the session and stops the
 camera. Backgrounding the tab pauses the reference video.
 
 ## Scoring contract and limits
@@ -81,8 +81,9 @@ camera. Backgrounding the tab pauses the reference video.
 - Points: 1000/700/400/0. LOST awards no points and breaks combo but remains a
   distinct judgment. Accuracy includes lost checkpoints in its denominator;
   tracking coverage shows the fraction with any valid comparison. With no valid
-  comparisons, accuracy is null. Keyboard results are explicitly stored as
-  `keyboard_practice`, never camera results.
+  comparisons, accuracy is null. New results always use `camera`. Older
+  `keyboard_practice` history/outbox entries remain compatible but no new practice
+  sessions can be created.
 - Browser MediaPipe Pose 0.5.1675469404 uses complexity 1. Its full-model SHA-256
   matches Python MediaPipe 0.10.18's packaged model:
   `e9a5c5cb17f736fafd4c2ec1da3b3d331d6edbe8a0d32395855aeb2cdfd64b9f`.
@@ -183,22 +184,22 @@ Vite. Test failures propagate as nonzero exit codes and retain diagnostics.
 GitHub execution still needs a pushed branch; local runs do not establish a
 green GitHub check or configure branch-protection requirements.
 
-The browser suite verifies real MP4 decoding, pause/seek/replay, keyboard scoring,
+The browser suite verifies real MP4 decoding, pause/replay, camera-only scoring boundaries,
 immediate end scores despite history failures, end-screen navigation, local
 MediaPipe inference and camera cleanup, real upload
 preparation, and the provider-failure fallback UI. History-failure and download-failure checks intercept API requests. Unit tests verify pose parity, invalid charts, lost tracking,
-pause/seek epochs, keyboard isolation, bundle pinning, and outbox recovery.
+pause/seek epochs, absence of keyboard scoring, bundle pinning, and outbox recovery.
 
-## Temporary timing overlay
+## Video presentation
 
-The game shows a switchable overlay on the reference video. Beat diamonds cross
-NOW at the chart's `beat_times`; pose bars span the actual scoring windows. The
-current/next stick-figure pose, Enter/MATCH prompt, score, and combo remain visible
-on the video. Positions derive from the existing video-time snapshot, including
-pause, seek, and replay. Arrow keys still seek; this does not invent directional
-notes or exact hit timestamps. Use it to compare detected beats with the music.
-Native video fullscreen displays only the video; keep the player inline to show
-the overlay. Artwork and human timing calibration remain follow-up work.
+The reference dancer's video has no Dancify beat/pose timing overlay or target
+figure layered over it. The start/replay countdown remains. Graphics already
+embedded in an uploaded video are part of that source video.
+
+The user's mirrored webcam retains its tracked-body skeleton. Illustrated target
+poses remain beside the webcam and in Developer tools' upcoming checkpoints.
+Removing the reference overlay does not change beat extraction, tracking, scoring,
+or the reference video's role as the gameplay clock.
 
 ## Planned session player identification
 
@@ -212,7 +213,7 @@ keyboard/on-screen confirmation), stores a face descriptor in browser memory for
 that session, and combines body continuity with face matching to retain/reacquire
 the player. Ambiguity pauses video and scoring; it never silently selects another
 person. Face data is neither uploaded nor persisted and is cleared on session
-completion/exit, re-pairing, and camera/mode changes. Models and thresholds remain
+completion/exit, re-pairing, and camera changes. Models and thresholds remain
 to be selected and tested. This adds no account system, scoring input from the
 wearable, schema fields or changes to the solo reference-video pipeline.
 
@@ -234,7 +235,7 @@ lock remain planned. Keep one player in frame.
 Changing/stopping cameras pauses reference playback, invalidates old captures,
 stops the previous stream, and clears the displayed camera frame. Enabling a
 replacement camera is explicit. Permission, unavailable-device, busy-camera and
-stalled-stream failures explain recovery; keyboard practice remains available.
+stalled-stream failures explain recovery; retry the camera or return to the menu.
 Preview mirroring does not change the existing unmirrored comparison convention.
 
 An independent watchdog stops the camera and pauses the round when a warmed-up
@@ -256,14 +257,14 @@ compare both. Playback timing and scoring are unchanged.
 
 ### Replay and movement diagnostics
 
-Use **Replay round** during play or **Play again** on the results screen. The R
-shortcut also starts a new session, clearing scores and movement logs. Each replay
+Use **Replay round** during play (with confirmation) or **Play again** on the
+results screen to start a new session, clearing scores and movement logs. Each replay
 shows a 3–2–1 countdown with video and scoring paused, then starts at the beginning.
-Cancel countdown (or Space) leaves playback paused. Changing mode/song, stopping
+Cancel countdown leaves playback paused. Changing song, stopping
 or switching the camera, or hiding the tab cancels the pending start. Camera
 samples captured before the countdown finishes cannot score the new round.
 Download a log before replaying if you want to keep it. Seeking, changing the
-song or mode, and closing the page also discard the current log.
+song, and closing the page also discard the current log.
 
 In camera mode, **Movement diagnostics** records up to 6,000 samples in browser
 memory (oldest samples are dropped when full). Disable recording or clear the log
@@ -311,7 +312,7 @@ camera stall limit; it is not a calibrated motion or identity test.
 **Controller connection and testing** offers Connect ESP32 and a simulator.
 Windows Chrome/Edge connects through the Windows Bluetooth adapter directly;
 WSL still hosts the web/API processes. Use localhost or HTTPS. Unsupported
-browsers keep keyboard and simulation available. The user must initiate the
+browsers keep on-screen controls and simulation available. The user must initiate the
 Bluetooth picker; no automatic reconnect or hardware availability is assumed.
 
 The receiver uses the UUIDs in `../schema/wearable.protocol.md`, also recorded
@@ -325,7 +326,7 @@ The 2026-10-11 feedback revision adds RUN and defines beat phase; use updated fi
 Up/Down arrows use the same ordered menu navigation. Text inputs/selects retain
 native behavior. Simulated Previous/Next/Select exercise it without an ESP32.
 Connection persists across songs; losing it pauses play/countdowns and requires
-reconnection or the explicit **Use keyboard controls** fallback. Reconnection
+reconnection or the explicit **Continue without controller** action. Reconnection
 never automatically resumes a round or identifies the wearer.
 
 Physical BLE acceptance is pending: advertise the frozen service and device-name
@@ -344,19 +345,36 @@ testing with one person in frame.
 
 ### Wearable output testing (no hardware needed)
 
-Open **Controller connection and testing**, click **Connect simulated ESP32**, then
-expand **Wearable command monitor**. Select a prepared song and use Keyboard
-practice or camera scoring. The simulator shows the same command queue used by
+The demo defaults to quiet wearable output: no metronome or per-hit beeps.
+One short TONE is requested at results for a completed, unseeked round earning
+at least one star (accuracy thresholds 20/35/50/65/85%). No comparable poses has
+no rating/cue. Results show the earned `N / 5 stars` beside the score; a practice
+segment or insufficient tracking shows an explanation instead. A hidden tab or
+disconnected device receives no delayed result cue on return/reconnect. Menu
+selection still requests the existing short TONE.
+
+The supplied Scroll 3, ButtonClick and Miss1 assets play through the computer's
+speakers for menu movement, activation and new MISS judgments during active play.
+Audio unlocks on a real pointer/key gesture. LOST tracking is silent; old or
+end-of-round judgments never cause a burst of miss sounds. Reference-video audio
+remains the music source and its currentTime remains the gameplay clock.
+See [asset status](src/assets/audio/README.md) for the four pending audio-only uploads.
+
+Open **Developer tools → Controller connection and testing**, click **Connect simulated ESP32**, then
+expand **Wearable command monitor**. Select a prepared song and enable the camera. The simulator shows the same command queue used by
 Bluetooth; it neither plays sound nor provides score/pose data.
+
+For the optional metronome diagnostic, set `VITE_DANCIFY_WEARABLE_METRONOME=true`
+before starting Vite. Leave it unset for the quiet demo. With that diagnostic enabled:
 
 - Playing at normal speed configures RUN:0 → BPM → BEAT → RUN:1. BEAT and periodic
   SYNC use seconds until the next actual chart beat from reference video time.
-- Finalized GOOD/SUPER/PERFECT checkpoints send HIT:1 once. Keyboard practice is
-  explicitly labeled; MISS/LOST do not trigger hits. Feedback stops after the last
+- Finalized GOOD/SUPER/PERFECT checkpoints send HIT:1 once.
+  MISS/LOST do not trigger hits. Feedback stops after the last
   chart beat, at results, during countdown, on pause/buffering/tracking loss,
-  hidden tab, and song/mode change. Non-unit playback speed disables feedback.
+  hidden tab, and song change. Non-unit playback speed disables feedback.
 - Replay waits for the countdown before reconfiguring; reconnect stays paused.
-  Disconnect the simulator during play to exercise the existing keyboard fallback.
+  Disconnect the simulator during play to exercise the Continue without controller action.
 - The monitor retains 200 successful writes in browser memory only. Clear commands
   to isolate a test; clearing the monitor does not reset gameplay or deduplication.
 - Menu selection requests TONE:880; turning the control is silent. Obsolete queued
@@ -375,3 +393,74 @@ No audible latency/drift guarantee has been verified; see the
 Regression commands: `npm test`, `npm run build`, then from the repository root
 run `python3 -m unittest discover -s scripts/tests -v` and the documented
 `web/scripts/test-integration.sh` with a shared installed Playwright browser path.
+
+### Illustrated target poses
+
+Prepared songs show **Lenny** or **Human** in the camera target and
+upcoming checkpoint list. Use **Target character** to switch without restarting. **Show target skeleton instead of artwork** switches all targets
+for comparison without restarting the video/session. Artwork loading/failure and
+unusable projected geometry retain the skeleton display; scores use the original
+chart landmarks in either presentation.
+
+The diagnostic page at `/debug/pictograms.html` on the Vite development server
+shows five explicitly labeled test poses. Load a prepared `dance.json` there to
+compare every real checkpoint against its skeleton. This page does not play or
+score a round and is not included in the production build.
+
+Source art, rig and alternatives for Human and Lenny are preserved under
+`assets/pictograms/`. Both characters use front/open-hand sprites in gameplay.
+Lenny has green skin, cream scutes/horns and dark green outlines from the supplied
+reference. Human has blue fills and dark navy outlines. The colors are baked into
+the checked-in runtime PNGs; palette definitions live in `src/pictograms/palette.json`.
+The original author used viewer-relative side labels; the adapter explicitly
+maps those to MediaPipe's anatomical indices without mirroring chart coordinates.
+The artwork has no inferred finger gestures, facial expressions or profile changes.
+
+Small runtime PNGs are checked in, so normal setup needs no extra generation step.
+After approved source-art changes, regenerate from the repository root with:
+
+```sh
+node web/scripts/bake-pictogram-colors.mjs
+npm test --prefix web
+npm run build --prefix web
+node --test assets/pictograms/rig.test.mjs
+```
+
+The bake command first runs the crop generator with Pillow already installed in
+the pipeline, then uses the installed Chromium to render the palette fills. Set
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE` if Chromium is not at `/usr/bin/chromium`. It
+crops each side inside the authored clip region and resizes to at most 256 pixels. It leaves
+source images/pivots unchanged and records source hashes/crop coordinates.
+See [the pictogram handoff](../docs/handoffs/pictogram-integration.md) for scope,
+review steps and remaining designer decisions. The Figma screen redesign is
+separate from this renderer integration.
+
+## First-draft visual pages
+
+See [design.md](../design.md) and [the implementation handoff](../docs/handoffs/game-pages.md).
+Main menu leads to song selection or import. The palette, large centered menu
+buttons, and bundled Bungee Inline/Jersey 25 fonts are shared through
+`src/styles.css`. Gameplay remains camera-only. Active-round exit/restart actions
+use confirmation dialogs; cancelling leaves playback paused until Ready/countdown.
+The side-by-side feeds and expandable movement/controller diagnostics remain.
+
+The latest Figma canvas was unavailable during implementation. Button sizing is
+provisional; final star exports and designer comparison remain. No fabricated
+star rating or progress percentage is displayed.
+
+
+## Approved setup and developer screens
+
+- Import: **Advanced · title and clip range** holds optional naming and range
+  controls. Without a title, the filename or URL hostname provides a name.
+- During a round, **Settings** contains camera selection/refresh/stop, body
+  skeleton, music volume, target character and wearable connection.
+- **Developer tools** holds movement logs, controller connection/simulation,
+  command monitoring and chart diagnostics (including timing-overlay toggles).
+- Opening either game tools screen pauses the video and cancels the countdown.
+  Back or Escape restores focus to its launcher; press Ready to resume.
+  The media elements, game session and score are preserved.
+- Main menu dark/light selection persists locally. It does not affect scoring.
+
+See [design integration status](DESIGN_INTEGRATION.md) for approved references,
+remaining screen work and the agreed star thresholds.

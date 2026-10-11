@@ -135,7 +135,9 @@ def main(argv=None):
         raise KeyboardInterrupt
     for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, interrupted)
-    with (state / 'launcher.lock').open('a') as lock:
+    inherited = os.environ.pop('DANCIFY_LAUNCH_LOCK_FD', None)
+    lock_file = os.fdopen(int(inherited), 'a') if inherited else (state / 'launcher.lock').open('a')
+    with lock_file as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:

@@ -25,7 +25,7 @@ async function setup(initializationStalls = false) {
   vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => ({ drawImage: vi.fn() }) }) });
   vi.stubGlobal('requestAnimationFrame', vi.fn(callback => { animation = callback; return 1; }));
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
-  const session = new GameSession(chart(), 'camera'); session.play();
+  const session = new GameSession(chart()); session.play();
   const error = vi.fn((_message: string) => session.pause());
   const sample = vi.fn();
   const tracker = new CameraTracker(video as unknown as HTMLVideoElement, () => ({ time: 1, epoch: session.epoch }), sample, error, async () => Detector as unknown as PoseConstructor);

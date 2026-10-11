@@ -1,6 +1,7 @@
 export type { Dance, Move, LandmarkTuple, Judgment } from '../../../schema/type';
 import type { Dance, Judgment } from '../../../schema/type';
 
+// Historical records/outbox entries may still contain the removed practice mode.
 export type Mode = 'camera' | 'keyboard_practice';
 export interface Song {
   id: string; title: string; source_url: string | null;

@@ -6,7 +6,7 @@ export function WearablePanel({ wearable }: { wearable: WearableClient }) {
   const state = useSyncExternalStore(wearable.subscribeState, wearable.snapshot);
   return <details><summary>Controller connection and testing</summary>
     <p role="status">Controller: {state.status}{state.simulated ? ' (simulated ESP32)' : ''}</p>
-    {!wearable.supported && <p>Web Bluetooth is unavailable here. Use desktop Chrome/Edge on localhost or HTTPS. Keyboard and simulated controls remain available.</p>}
+    {!wearable.supported && <p>Web Bluetooth is unavailable here. Use desktop Chrome/Edge on localhost or HTTPS. On-screen and simulated menu controls remain available. Camera tracking is required to play.</p>}
     <button disabled={!wearable.supported || state.status !== 'disconnected'} onClick={() => void wearable.connect()}>Connect ESP32</button>{' '}
     <button disabled={state.status !== 'connected'} onClick={() => wearable.disconnect()}>Disconnect ESP32</button>
     <button disabled={state.status !== 'disconnected'} onClick={() => wearable.connectSimulator()}>Connect simulated ESP32</button>

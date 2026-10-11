@@ -39,6 +39,8 @@ Firmware: not yet scaffolded in this repository.
 
 ## Documentation
 
+- `design.md` — visual choices, component references, and design revision guidelines
+- `docs/handoffs/game-pages.md` — first-draft pages and camera-only gameplay changes
 - `PRD.md.md` — product vision, target architecture, and roadmap
 - `AGENTS.md.md` — ownership, git discipline, and rules for AI coding agents
 - `pipeline/README.md` — shipped prep MVP and supported inputs

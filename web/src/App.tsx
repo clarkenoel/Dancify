@@ -1,38 +1,64 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { DancifyApi, preparationHelp } from './core/api';
 import { ResultOutbox } from './core/outbox';
-import type { Bundle, Mode, Play, PreparationOptions, Song } from './core/types';
+import type { Bundle, Play, PreparationOptions, Song } from './core/types';
 import { usePreparation } from './hooks/usePreparation';
 import { GamePanel } from './components/GamePanel';
 import { WearablePanel } from './components/WearablePanel';
 import { WearableClient } from './core/WearableClient';
+import { ToolsDialog } from './components/ToolsDialog';
+import { MainMenu } from './components/MainMenu';
 import { MenuNavigation } from './core/menuNavigation';
+import { useSoundEffects } from './hooks/useSoundEffects';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { LoadingStars, RinkStars } from './components/RinkArtwork';
 
 const api = new DancifyApi();
 const outbox = new ResultOutbox(api, localStorage);
 const message = (e: unknown) => e instanceof Error ? e.message : 'Unexpected error';
+type Screen = 'main' | 'library' | 'prepare';
 
+// Figma main 15-237, library 15-358, prepare 15-259/15-281.
+// https://www.figma.com/design/73KXHiJcCoHRsR5XK54kQ7/Dancify-Roller-Rink-Redesign
 export default function App() {
+  const [preparingAudio, setPreparingAudio] = useState(false);
+  const { play: playSound, stopGameplay: stopSounds } = useSoundEffects(preparingAudio);
   const [wearable] = useState(() => new WearableClient());
   const menu = useRef(new MenuNavigation());
   const root = useRef<HTMLElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const menuRoot = () => root.current?.querySelector<HTMLElement>('dialog[open]') ?? root.current;
+  const moveMenu = useCallback((scope: HTMLElement, direction: -1 | 1) => {
+    const previous = document.activeElement;
+    menu.current.move(scope, direction);
+    if (document.activeElement !== previous) playSound('menuMove');
+  }, [playSound]);
   useEffect(() => {
     const unsubscribe = wearable.subscribe(event => {
-      if (!root.current || document.hidden) return;
-      if (event.type === 'navigate') menu.current.move(root.current, event.direction === 'up' || event.direction === 'left' ? -1 : 1);
-      if (event.type === 'activate') menu.current.activate(root.current);
+      const scope = menuRoot();
+      if (!scope || document.hidden) return;
+      if (event.type === 'navigate') moveMenu(scope, event.direction === 'up' || event.direction === 'left' ? -1 : 1);
+      if (event.type === 'activate') menu.current.activate(scope);
     });
     return () => { unsubscribe(); wearable.disconnect(); };
-  }, [wearable]);
-  const [screen, setScreen] = useState<'main' | 'library'>('main');
-  const [roundEnded, setRoundEnded] = useState(false);
+  }, [wearable, moveMenu]);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try { return localStorage.getItem('dancify-theme') === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
+  });
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try { localStorage.setItem('dancify-theme', theme); } catch { /* Theme still works without storage. */ }
+  }, [theme]);
+  const [developerOpen, setDeveloperOpen] = useState(false);
+  const [screen, setScreen] = useState<Screen>('main');
   const [songs, setSongs] = useState<Song[]>([]);
   const [selected, setSelected] = useState('');
   const [bundle, setBundle] = useState<Bundle | null>(null);
-  const [mode, setMode] = useState<Mode>('keyboard_practice');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState<Song | null>(null);
   const [loading, setLoading] = useState(false);
+  const [libraryLoading, setLibraryLoading] = useState(true);
   const [source, setSource] = useState<'url' | 'upload'>('url');
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
@@ -46,7 +72,11 @@ export default function App() {
   const mounted = useRef(true);
   const selectedRef = useRef(selected); selectedRef.current = selected;
   const bundleRef = useRef(bundle); bundleRef.current = bundle;
-  const refresh = useCallback(async () => { const list = await api.listSongs(); if (mounted.current) setSongs(list); }, []);
+  const refresh = useCallback(async () => {
+    setLibraryLoading(true);
+    try { const list = await api.listSongs(); if (mounted.current) setSongs(list); }
+    finally { if (mounted.current) setLibraryLoading(false); }
+  }, []);
   const load = useCallback(async (id: string) => {
     request.current?.abort(); const controller = new AbortController(); request.current = controller;
     setBundle(null); setError(''); setLoading(true);
@@ -63,6 +93,8 @@ export default function App() {
     void refresh().catch(e => { if (mounted.current) setError(`Cannot reach the local song service. ${message(e)}`); });
     return () => { mounted.current = false; request.current?.abort(); };
   }, [refresh]);
+  useEffect(() => { if (!bundle) heading.current?.focus(); }, [screen, bundle]);
+  useEffect(() => { stopSounds(); }, [bundle, screen, stopSounds]);
   useEffect(() => {
     if (!selected) return;
     const controller = new AbortController(); setHistory([]);
@@ -83,7 +115,8 @@ export default function App() {
     void act(async () => {
       const range = options();
       if (source === 'upload' && (!file || file.size === 0 || file.size > 500 * 1024 * 1024)) throw new Error('Choose a nonempty video file under 500 MiB.');
-      const song = source === 'url' ? await api.createUrl(title, url) : await api.upload(title, file!);
+      const videoTitle = (title.trim() || (source === 'upload' ? file!.name.replace(/\.[^.]+$/, '') || 'Uploaded video' : `Video from ${new URL(url).hostname}`)).slice(0, 256);
+      const song = source === 'url' ? await api.createUrl(videoTitle, url) : await api.upload(videoTitle, file!);
       request.current?.abort(); setSelected(song.id); setBundle(null); setLoading(false); await refresh();
       const job = await api.prepare(song.id, { ...range, source_kind: source }); preparation.watch(job);
     });
@@ -92,63 +125,86 @@ export default function App() {
     request.current?.abort(); setSelected(song.id); setBundle(null); setLoading(false); setError('');
     if (song.status === 'ready') void load(song.id);
   };
-  const leaveGame = (destination: 'main' | 'library') => {
-    request.current?.abort(); setSelected(''); setBundle(null); setLoading(false);
-    setHistory([]); setError(''); setScreen(destination); setRoundEnded(false);
-    window.scrollTo(0, 0);
+  const navigate = (destination: Screen) => {
+    request.current?.abort(); setSelected(''); selectedRef.current = ''; setBundle(null); setLoading(false);
+    setHistory([]); setError(''); setScreen(destination); window.scrollTo(0, 0);
   };
   const active = songs.find(s => s.id === selected);
   const job = preparation.job;
   const activeJob = job && (job.status === 'queued' || job.status === 'processing');
-  return <main ref={root} onClickCapture={event => {
+  useEffect(() => { setPreparingAudio(!bundle && screen === 'prepare' && (busy || !!activeJob) && !preparation.error); }, [bundle, screen, busy, activeJob, preparation.error]);
+  return <main ref={root} className="app-shell" onClickCapture={event => {
+    const clicked = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
+    if (clicked && !clicked.disabled) playSound('select');
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-controller]');
     if (button && !button.disabled && !document.hidden) wearable.selectionFeedback();
   }} onKeyDown={event => {
     if (event.ctrlKey || event.altKey || event.metaKey || (event.target as HTMLElement).closest('input, textarea, select, video, [contenteditable="true"]')) return;
     if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-      event.preventDefault(); menu.current.move(root.current!, event.key === 'ArrowUp' ? -1 : 1);
+      event.preventDefault(); const scope = menuRoot(); if (scope) moveMenu(scope, event.key === 'ArrowUp' ? -1 : 1);
     }
   }}>
-    <h1>Dancify</h1>
-    <p>Development interface — visual components will be connected to the same game logic when the designs arrive.</p>
-    <WearablePanel wearable={wearable} />
-    {error && <p role="alert">{error}</p>}
-    {!bundle && <h2>{screen === 'main' ? 'Main menu' : 'Choose a song'}</h2>}
-    {!bundle && screen === 'library' && <button data-controller onClick={() => leaveGame('main')}>Main menu</button>}
-    <section hidden={!!bundle || screen === 'library'} aria-label="Prepare a song"><h2>Prepare a song</h2>
-      <form onSubmit={create}>
-        <p><label>Song title <input required maxLength={256} value={title} onChange={e => setTitle(e.target.value)} /></label></p>
-        <p><label>Source <select aria-label="Source" value={source} onChange={e => setSource(e.target.value as 'url' | 'upload')}><option value="url">Video URL</option><option value="upload">Upload video with music</option></select></label></p>
-        {source === 'url' ? <p key="url"><label>Video URL <input type="url" required value={url} onChange={e => setUrl(e.target.value)} /></label></p> : <p key="upload"><label>Video file <input type="file" accept="video/*" required onChange={e => setFile(e.target.files?.[0] ?? null)} /></label></p>}
-        <p>Choose a continuous solo-dancer clip with music. A file upload bypasses download failures, but must still pass timing and tracking checks.</p>
-        <fieldset><legend>Optional choreography range (seconds)</legend>
-          <label>Start time <input type="number" min="0" step="0.1" value={start} onChange={e => setStart(e.target.value)} /></label>{' '}
-          <label>End time <input type="number" min="0.1" step="0.1" value={end} onChange={e => setEnd(e.target.value)} /></label>
-        </fieldset>
-        <p><button disabled={busy || !!activeJob}>Create and prepare</button></p>
-      </form>
-      {job && <section aria-label="Preparation progress">
-        <p role="status">Preparation: {job.status} · {job.stage}</p>
-        {job.error_code && <p role="alert">{preparationHelp[job.error_code]} {job.error_message}</p>}
-        {job.has_diagnostic_video && <p><a href={api.artifact(job, 'diagnostic-video')} target="_blank" rel="noreferrer">View tracking diagnostic video</a></p>}
-        {job.has_diagnostic && <p><a href={api.artifact(job, 'diagnostic')} target="_blank" rel="noreferrer">Tracking details</a></p>}
-        {job.status === 'failed' && <><button disabled={busy} onClick={() => void act(async () => preparation.watch(await api.retry(job)))}>Retry preparation</button>{' '}<button onClick={() => setSource('upload')}>Use upload fallback</button></>}
-        {preparation.error && <p role="alert">Polling stopped: {preparation.error} <button onClick={() => preparation.watch(job)}>Reconnect to preparation</button></p>}
+    <header className={`site-header ${!bundle && screen === 'main' ? 'design-header' : ''}`}><span className="wordmark">Dancify</span>
+      {!bundle && <button className="quiet" data-controller onClick={() => navigate('main')}>Main menu</button>}
+    </header>
+    {error && <div className="service-error" role="alert"><p>{error}</p><button data-controller onClick={() => void act(refresh)} disabled={busy}>Retry connection</button></div>}
+    {!bundle && <div className={`page page-${screen}`}>
+      <div className="page-heading">
+        <h1 ref={heading} tabIndex={-1}>{screen === 'main' ? 'Your next dance starts here' : screen === 'library' ? 'Choose a song' : 'Import a video'}</h1>
+        <p>{screen === 'main' ? 'Choose a prepared video, import a clip.' : screen === 'library' ? 'Prepared videos and their current chart status.' : 'Prepare a clip locally before playing.'}</p>
+      </div>
+      {screen === 'main' && <MainMenu wearable={wearable} theme={theme} onTheme={setTheme} onLibrary={() => navigate('library')} onImport={() => navigate('prepare')} />}
+      <section hidden={screen !== 'prepare'} className="panel prepare-panel" aria-label="Prepare a song">
+        <form onSubmit={create} onInvalidCapture={event => {
+          const advanced = (event.target as HTMLElement).closest('details');
+          if (advanced) advanced.open = true;
+        }}>
+          <div className="action-row centered"><button type="button" className="primary" data-controller onClick={() => { setSource(source === 'url' ? 'upload' : 'url'); setFile(null); }}>{source === 'url' ? 'Upload file' : 'Use video URL'}</button></div>
+          {source === 'url' ? <label key="url">Video URL <input type="url" required value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" /></label> : <label key="upload">Video file <input type="file" accept="video/*" required onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>}
+          <p className="help">Choose a continuous solo-dancer clip with music. Uploading bypasses download failures; timing and tracking checks still apply.</p>
+          <details className="advanced-import"><summary>Advanced · title and clip range</summary>
+            <label>Song title <input maxLength={256} value={title} onChange={e => setTitle(e.target.value)} placeholder="Optional — defaults to the file name or source" /></label>
+          <fieldset><legend>Optional choreography range (seconds)</legend><div className="field-pair">
+            <label>Start time <input type="number" min="0" step="0.1" value={start} onChange={e => setStart(e.target.value)} /></label>
+            <label>End time <input type="number" min="0.1" step="0.1" value={end} onChange={e => setEnd(e.target.value)} /></label>
+          </div></fieldset>
+          </details>
+          <div className="action-row centered"><button className="primary" data-controller disabled={busy || !!activeJob}>Prepare video</button><button type="button" data-controller onClick={() => navigate('library')}>Back to library</button></div>
+        </form>
+        {job && <section className="preparation-status" aria-label="Preparation progress">
+          <p role="status">Preparation: {job.status} · {job.stage}</p>
+          {activeJob && <><LoadingStars /><progress aria-label="Preparing video" /></>}
+          {job.error_code && <p role="alert">{preparationHelp[job.error_code]} {job.error_message}</p>}
+          {job.has_diagnostic_video && <p><a href={api.artifact(job, 'diagnostic-video')} target="_blank" rel="noreferrer">View tracking diagnostic video</a></p>}
+          {job.has_diagnostic && <p><a href={api.artifact(job, 'diagnostic')} target="_blank" rel="noreferrer">Tracking details</a></p>}
+          {job.status === 'failed' && <div className="action-row"><button data-controller disabled={busy} onClick={() => void act(async () => preparation.watch(await api.retry(job)))}>Retry preparation</button><button data-controller onClick={() => setSource('upload')}>Use upload fallback</button></div>}
+          {preparation.error && <p role="alert">Polling stopped: {preparation.error} <button data-controller onClick={() => preparation.watch(job)}>Reconnect to preparation</button></p>}
+        </section>}
+        {loading && <p role="status">Loading prepared bundle…</p>}
+      </section>
+      <section hidden={screen !== 'library'} className="library-panel" aria-label="Song library">
+        <div className="library-toolbar"><p>{songs.length} {songs.length === 1 ? 'song' : 'songs'} in your library</p><div className="action-row"><button data-controller className="quiet" onClick={() => void act(refresh)} disabled={busy || libraryLoading}>Refresh songs</button><button data-controller onClick={() => navigate('prepare')}>Import video</button></div></div>
+        {libraryLoading && <p role="status">Loading songs…</p>}
+        {!libraryLoading && songs.length === 0 && <div className="empty-state"><h2>Your dance floor is waiting</h2><p>Import your first video to start a song collection.</p></div>}
+        <ul className="song-list">{songs.map((song, index) => <li key={song.id} className={selected === song.id ? 'selected' : ''}>
+          <span className="song-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+          <button className="song-choice" data-controller aria-pressed={selected === song.id} onClick={() => select(song)}>{song.title}</button>
+          <span className="song-status">{song.status === 'ready' && (!song.has_report || !song.active_bundle_id) ? 'Needs regeneration' : song.status}{song.duration ? ` · ${Math.ceil(song.duration)}s` : ''}</span>
+          <button className="primary song-delete" data-controller aria-label={`Delete ${song.title}`} title={song.status === 'processing' || (activeJob && job.song_id === song.id) ? 'Wait for preparation to finish before deleting this song.' : pending.some(item => item.songId === song.id) ? 'Sync the pending score before deleting this song.' : 'Delete song and saved history'} disabled={busy || song.status === 'processing' || !!(activeJob && job.song_id === song.id) || pending.some(item => item.songId === song.id)} onClick={() => setDeleting(song)}>Delete song</button>
+        </li>)}</ul>
+        {active && <div className="panel"><h2>{active.title}</h2><div className="action-row"><button data-controller disabled={busy || !!activeJob} onClick={() => { setScreen('prepare'); void act(async () => preparation.watch(await api.prepare(active.id, options()))); }}>Prepare selected song / new range</button><button data-controller disabled={loading || active.status !== 'ready'} onClick={() => void load(active.id)}>Load latest prepared bundle</button></div></div>}
+        {loading && <p role="status">Loading prepared bundle…</p>}
+      </section>
+      {selected && history.length > 0 && <section className="panel" aria-label="Play history"><h2>Play history</h2><ul>{history.map(play => <li key={play.id}>{play.player_name}: {play.score} · {play.mode === 'keyboard_practice' ? 'Legacy practice result' : 'Camera'} · {play.played_at}</li>)}</ul></section>}
+      {pending.length > 0 && <section className="panel" aria-label="Pending results"><h2>History waiting to sync</h2><p>Your completed scores are available even when saving fails.</p>
+        {pending.map(item => <p key={item.result.client_session_id}>{item.result.player_name}: {item.result.score}{' '}
+          <button data-controller disabled={sending === item.result.client_session_id} onClick={() => { setSending(item.result.client_session_id); void act(async () => { await outbox.send(item); setPending(outbox.list()); }).finally(() => setSending(null)); }}>Retry pending result</button></p>)}
       </section>}
-    </section>
-    <section hidden={!!bundle} aria-label="Song library"><h2>Songs</h2>
-      <button onClick={() => void act(refresh)} disabled={busy}>Refresh songs</button>
-      <ul>{songs.map(song => <li key={song.id}><button data-controller aria-pressed={selected === song.id} onClick={() => select(song)}>{song.title}</button> — {song.status}{song.status === 'ready' && (!song.has_report || !song.active_bundle_id) ? ' (needs regeneration)' : ''}</li>)}</ul>
-      {active && <p><button disabled={busy || !!activeJob} onClick={() => void act(async () => preparation.watch(await api.prepare(active.id, options())))}>Prepare selected song / new range</button>{' '}
-        <button disabled={loading || active.status !== 'ready'} onClick={() => void load(active.id)}>Load latest prepared bundle</button></p>}
-      {loading && <p role="status">Loading prepared bundle…</p>}
-    </section>
-    {bundle && <><div hidden={roundEnded}><button data-controller onClick={() => setMode(mode === 'camera' ? 'keyboard_practice' : 'camera')}>Switch to {mode === 'camera' ? 'keyboard practice' : 'camera scoring'}</button></div><label hidden={roundEnded}>Game mode <select value={mode} onChange={e => setMode(e.target.value as Mode)}><option value="keyboard_practice">Keyboard practice</option><option value="camera">Camera scoring</option></select></label>
-      <GamePanel key={`${bundle.id}:${mode}`} bundle={bundle} mode={mode} wearable={wearable} outbox={outbox} onResult={() => setPending(outbox.list())} onChooseSong={() => leaveGame('library')} onMainMenu={() => leaveGame('main')} onEndedChange={setRoundEnded} /></>}
-    <section hidden={!!bundle} aria-label="Pending results"><h2>Pending results</h2>
-      {pending.length === 0 ? <p>No unsaved results.</p> : pending.map(item => <p key={item.result.client_session_id}>{item.result.player_name}: {item.result.score} ({item.result.mode}){' '}
-        <button disabled={sending === item.result.client_session_id} onClick={() => { setSending(item.result.client_session_id); void act(async () => { await outbox.send(item); setPending(outbox.list()); }).finally(() => setSending(null)); }}>Retry pending result</button></p>)}
-    </section>
-    {selected && !bundle && <section aria-label="Play history"><h2>Play history</h2><ul>{history.map(play => <li key={play.id}>{play.player_name}: {play.score} · {play.mode || 'camera'} · {play.played_at}</li>)}</ul></section>}
+    </div>}
+    {bundle && <GamePanel key={bundle.id} bundle={bundle} wearable={wearable} outbox={outbox} onSound={playSound} onStopSounds={stopSounds} onResult={() => setPending(outbox.list())} onChooseSong={() => navigate('library')} onMainMenu={() => navigate('main')} />}
+    {!bundle && <footer className="site-footer"><button data-controller onClick={() => setDeveloperOpen(true)}>Developer tools</button><p>Camera tracking stays on this device.</p></footer>}
+    {developerOpen && <ToolsDialog title="Developer tools" subtitle="Testing controls kept separate from the player experience." onClose={() => setDeveloperOpen(false)}><WearablePanel wearable={wearable} /><p className="help">Movement logs and chart diagnostics are available in Developer tools during a round.</p></ToolsDialog>}
+    {deleting && <ConfirmDialog title={`Delete “${deleting.title}”?`} description="This removes the video, prepared dance and saved play history from your library. This cannot be undone." help="" confirmLabel="Delete song" onCancel={() => setDeleting(null)} onConfirm={() => { const song = deleting; setDeleting(null); void act(async () => { await api.deleteSong(song.id); if (selectedRef.current === song.id) { request.current?.abort(); setSelected(''); setBundle(null); setLoading(false); setHistory([]); } setSongs(previous => previous.filter(item => item.id !== song.id)); await refresh(); }); }} />}
+    <RinkStars />
   </main>;
 }

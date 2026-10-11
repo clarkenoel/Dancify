@@ -24,12 +24,16 @@ You are working on the game frontend only. Person B owns this directory.
 - Master clock is the reference `<video>` element's `currentTime`; never run a
   separate audio element as a competing clock.
 - Pose comparison returns `null` for insufficient data.
-- Keyboard fallback always works.
+- Camera-only gameplay: no keyboard scoring/practice mode or global gameplay shortcuts. Keep keyboard menu/button accessibility. Camera failures offer retry/menu exit; wearable failures may continue without a controller, still using the camera.
 - Planned webcam player lock follows [`../docs/plans/webcam-player-lock.md`](../docs/plans/webcam-player-lock.md). It is not shipped: do not claim the single-person runtime preserves identity in crowds.
 - When implementing player lock, keep session face descriptors in browser memory only; never persist, upload or log them. Ambiguous identity pauses video/scoring, never silently switches players. Preserve frozen chart/BLE contracts.
 - WearableClient owns BLE input/output and the command simulator. Preserve the re-frozen 2026-10-11 protocol; wearableFeedback follows video time and finalized judgments without changing scores. Physical ESP32 timing remains unverified.
 
 ## Figma MCP
+
+Read [`../design.md`](../design.md) before visual changes. Shared styles and bundled
+fonts live in `src/styles.css` and `src/assets/fonts/`. Record the Figma revision
+and distinguish verified component measurements from provisional demo styling.
 
 You have access to the Figma MCP server. Use it to:
 

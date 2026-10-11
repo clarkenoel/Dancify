@@ -14,7 +14,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 function setup() {
-  const video = new Video(); const session = new GameSession(chart(), 'camera'); const error = vi.fn();
+  const video = new Video(); const session = new GameSession(chart()); const error = vi.fn();
   const controller = new PlaybackController(video as unknown as HTMLVideoElement, session, vi.fn(), error);
   return { video, session, controller, error };
 }
@@ -57,7 +57,7 @@ it('surfaces autoplay rejection without leaving a running countdown', async () =
   expect(error).toHaveBeenCalledWith('Playback blocked'); expect(controller.countdown).toBeNull(); controller.dispose();
 });
 it('requires readiness on camera start and cancels countdown when readiness is lost', async () => {
-  const video = new Video(); const session = new GameSession(chart(), 'camera'); const error = vi.fn();
+  const video = new Video(); const session = new GameSession(chart()); const error = vi.fn();
   let ready = false;
   const controller = new PlaybackController(video as unknown as HTMLVideoElement, session, vi.fn(), error, () => ready, true);
   await controller.toggle(); expect(controller.countdown).toBeNull(); expect(video.play).not.toHaveBeenCalled();
@@ -70,7 +70,7 @@ it('requires readiness on camera start and cancels countdown when readiness is l
 });
 
 function automaticSetup() {
-  const video = new Video(); const session = new GameSession(chart(), 'camera');
+  const video = new Video(); const session = new GameSession(chart());
   const readiness = new BodyReadiness(); const error = vi.fn();
   const controller = new PlaybackController(video as unknown as HTMLVideoElement, session, vi.fn(), error, () => readiness.isReady(Date.now()), true);
   const observe = (fullBody = true) => { readiness.update(fullBody, Date.now()); controller.observeReadiness(); };
@@ -114,8 +114,8 @@ it('camera replay waits for readiness and blocked autoplay does not retry in a l
   expect(video.play).toHaveBeenCalledTimes(1); expect(error).toHaveBeenCalledWith('Playback blocked');
   expect(controller.waitingForBody).toBe(false); controller.dispose();
 });
-it('keyboard practice never auto-starts from readiness observations', async () => {
-  const video = new Video(); const session = new GameSession(chart(), 'keyboard_practice');
+it('a controller without auto-start enabled ignores readiness observations', async () => {
+  const video = new Video(); const session = new GameSession(chart());
   const controller = new PlaybackController(video as unknown as HTMLVideoElement, session, vi.fn(), vi.fn());
   controller.observeReadiness(); await vi.advanceTimersByTimeAsync(5000);
   expect(video.play).not.toHaveBeenCalled(); controller.dispose();

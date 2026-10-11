@@ -105,7 +105,7 @@ export class WearableClient {
   }
   private outputFailed(message: string) {
     this.generation++; this.cleanup();
-    this.setState('disconnected', `${message} Reconnect or continue with keyboard controls.`);
+    this.setState('disconnected', `${message} Reconnect or continue without the controller.`);
     this.simulate({ type: 'disconnect' });
   }
   /** Cancels queued commands. An already submitted GATT write cannot be recalled. */
@@ -159,7 +159,7 @@ export class WearableClient {
     for (const event of this.decoder.feed(new TextDecoder().decode(value))) this.simulate(event);
   };
   private disconnected = () => {
-    this.generation++; this.cleanup(); this.setState('disconnected', 'Controller disconnected. Reconnect or continue with keyboard controls.');
+    this.generation++; this.cleanup(); this.setState('disconnected', 'Controller disconnected. Reconnect or continue without the controller.');
     this.simulate({ type: 'disconnect' });
   };
   private cleanup() {
@@ -172,7 +172,7 @@ export class WearableClient {
   }
   async connect() {
     if (this.connecting || this.state.status === 'connected') return;
-    if (!this.bluetooth) { this.setState('disconnected', 'Web Bluetooth is unavailable. Use desktop Chrome or Edge on localhost/HTTPS, or use keyboard controls.'); return; }
+    if (!this.bluetooth) { this.setState('disconnected', 'Web Bluetooth is unavailable. Use desktop Chrome or Edge on localhost/HTTPS, or continue without the controller.'); return; }
     const generation = ++this.generation; this.connecting = true; this.setState('connecting');
     let device: BleDevice | undefined;
     try {

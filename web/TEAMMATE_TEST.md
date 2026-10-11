@@ -13,7 +13,7 @@ delivered to the test machine; do not assume the remote branch includes them.
 
 | Test | Actions | Expected result |
 | --- | --- | --- |
-| First camera round | Choose camera scoring, enable camera, allow permission, start too close, then step back | One second of stable full-body visibility automatically starts 3–2–1, without Ready/controller input |
+| First camera round | Choose a song, enable camera, allow permission, start too close, then step back | One second of stable full-body visibility automatically starts 3–2–1, without Ready/controller input |
 | Start | Stay fully in frame during countdown | Video and score stay paused during 3–2–1; playback then starts automatically |
 | Countdown framing loss | Step out during countdown, then return | Countdown cancels; stable full-body tracking restarts from three |
 | Deliberate pause | Pause round or cancel countdown and stay in view | Remains paused; use Ready to resume |
@@ -22,8 +22,8 @@ delivered to the test machine; do not assume the remote branch includes them.
 | Framing loss | Move out of frame while playing, then return | Playback pauses after the framing-loss grace period; return alone does not auto-resume; Ready/countdown resumes |
 | Camera recovery | Stop camera during play; separately unplug an external webcam | Playback pauses, feedback explains recovery; enabling a working camera requires readiness again |
 | Background tab | Start a countdown or round, switch tabs, then return | Playback/countdown stops; no surprise restart |
-| Keyboard fallback | Deny camera access, switch to Keyboard practice | Song remains playable; Enter/on-screen hit scores practice checkpoints and results identify practice mode |
-| Menu simulator | Open Controller connection and testing; use Previous item, Next item, Select item | Visible focus moves among enabled marked actions; selection opens the focused song/action |
+| Camera required | Deny camera access; try Enter, Space, R and arrow keys outside controls | Retry/menu exit remain available; no keyboard practice or hit control exists, no playback or points without camera readiness |
+| Menu simulator | Open Developer tools → Controller connection and testing; use Previous item, Next item, Select item | Visible focus moves among enabled marked actions; selection opens the focused song/action |
 | Keyboard menus | Use Up/Down outside a text field, then Enter | Focus/selection works; typing in form fields retains normal editing |
 | Body diagnostics | Complete a moving round and a standing-still round; download each log before replay | Logs contain body sample decisions and checkpoint timestamps; compare unexpected judgments without changing thresholds yet |
 
@@ -40,7 +40,7 @@ Connect through the browser's Connect ESP32 action. Confirm the frozen UUIDs and
 `Dancify-Wearable` advertised name prefix with the firmware teammate. Test actual
 rotation in both directions, selection, rapid inputs and 60 stationary seconds.
 Disconnect during playback and countdown: the game must pause and offer explicit
-keyboard fallback. Reconnect without restarting the page; reconnect must not
+Continue without controller. Reconnect without restarting the page; reconnect must not
 start playback automatically. Simulator/browser mocks do not validate radio
 reliability. Browser output uses the revised 2026-10-11 protocol; old firmware
 without RUN is incompatible. Validate normal playback beats, one triple-click per
@@ -58,7 +58,7 @@ software logs cannot establish the physical timing target.
   leaving behind another at the same position, including obscured/turned faces.
 - A returning player requires explicit confirmation plus readiness/countdown;
   another person cannot inherit the score. Re-pairing starts a fresh run.
-- Replay, exit, camera/mode changes and completion clear enrollment. No face data
+- Replay, exit, camera changes and completion clear enrollment. No face data
   appears in exported logs, browser storage or API requests.
 - Test actual lighting, glasses, head turns, fast motion and device performance.
   Record false pauses or incorrect matches without collecting face recordings.
@@ -70,18 +70,47 @@ physical webcam recovery, Bluetooth reliability or scoring calibration.
 
 ## Feedback simulator (before hardware)
 
-1. Open Controller connection and testing, connect the simulated ESP32 and expand
+1. Open Developer tools → Controller connection and testing, connect the simulated ESP32 and expand
    Wearable command monitor. Expect RUN:0; no automatic playback or score change.
 2. Choose a prepared song, play at normal speed, and inspect RUN:0, BPM, BEAT,
    RUN:1. A SYNC arrives about every five video seconds while beats remain.
-3. In Keyboard practice, press Hit checkpoint during a checkpoint window. Expect
-   one HIT after it closes; no repeated HIT when the score display refreshes.
-   Repeat with camera mode and real motion; controls cannot supply camera scores.
+3. Enable the camera and match a target. A finalized GOOD/SUPER/PERFECT sends
+   one HIT; MISS/LOST do not. No repeated HIT when the display refreshes. Controls
+   cannot supply pose samples or camera scores.
 4. Pause, hide the tab, stop the camera, or leave the body frame: expect stop and
    no stale hit burst on resumption. At results expect RUN:0. Play again must keep
    feedback stopped during countdown and configure it after playback starts.
 5. Disconnect during play, then reconnect: video must stay paused. Verify the
-   explicit keyboard fallback still works. Clear commands only clears the monitor.
+   explicit Continue without controller still works. Clear commands only clears the monitor.
 
 Record any failure with song/bundle, mode and video time. Simulator commands stay
 in memory (last 200); they are not physical piezo or scoring-accuracy measurements.
+
+## Illustrated targets
+
+- Open a ready song: the reference video has no Dancify beat/pose timing overlay.
+  The user's webcam still shows the tracked-body skeleton. Lenny appears beside
+  the webcam and in Developer tools' upcoming targets.
+- Switch **Target character** to Human: it should have blue fill/dark outlines.
+  Switch back to Lenny: it should have green skin and cream scutes/horns.
+- Pause, note the video time/score, then toggle **Show target skeleton instead of
+  artwork** twice. Video time, score and camera state must remain unchanged.
+- Review an asymmetric pose: its raised arm must stay on the same screen side as
+  the original chart skeleton. The webcam itself remains mirrored.
+- Play a camera round, see immediate results, replay through countdown, and switch
+  songs. Watch for missing parts, clipped hands/feet and overlapping limbs.
+- Ask the designer to review `/debug/pictograms.html` on the local Vite server.
+  Upload the demo's prepared `dance.json` to compare artwork and skeleton for each
+  checkpoint. This gallery is diagnostic and produces no scores.
+
+## First-draft pages
+
+- Review main menu, library, import, gameplay, countdown, confirmation and results
+  at 1440 × 900, 1920 × 1080, and a smaller laptop window. Compare with the latest
+  Figma revision; current larger button dimensions are provisional.
+- Read labels from the dance position. Check the two bundled fonts, focus outlines,
+  long song titles, narrow layouts, and browser zoom.
+- Confirm before leaving/restarting an active round; Escape cancels, restores
+  focus, and leaves playback paused. Results navigation needs no confirmation.
+- Import a real local clip. Confirm actual preparation stages and successful
+  loading; test service failure/retry and upload fallback after download failure.

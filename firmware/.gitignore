@@ -1,0 +1,4 @@
+# Arduino IDE/CLI generated output; keep the reviewed sources only.
+**/build/
+firmware_tests
+buzzer_bench
