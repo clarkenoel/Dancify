@@ -11,7 +11,7 @@ failed before launch. Local runs had used an explicit system Chromium executable
 which bypassed the broken lookup.
 
 - `.github/workflows/web.yml`: set job-wide `PLAYWRIGHT_BROWSERS_PATH` to
-  `${{ runner.temp }}/playwright-browsers` for installation and execution.
+  `${{ github.workspace }}/.playwright-browsers` for installation and execution.
 - `web/playwright.preflight.config.ts` and `web/scripts/browser-preflight.spec.ts`:
   reuse the integration browser options to launch Chromium and render a page,
   without starting the app server.
@@ -39,3 +39,7 @@ which bypassed the broken lookup.
 No application logic or runtime dependency changes. Feature-branch publication
 is authorized; no merge to main. A successful local run does not establish a
 green GitHub check; the updated workflow must run after this change is pushed.
+
+The first publication used `runner.temp` in job-level `env`, which GitHub
+rejects because the runner context is unavailable there. It was replaced with
+`github.workspace`; actionlint verifies the corrected expression and workflow.

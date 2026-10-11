@@ -39,7 +39,7 @@ jobs:
     timeout-minutes: 20
     env:
       # Installation and execution must agree even when the test runner isolates XDG caches.
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/playwright-browsers
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
