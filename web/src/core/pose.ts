@@ -19,24 +19,39 @@ export function normalizePose(raw: LandmarkTuple[], width: number, height: numbe
 const vector = (a: LandmarkTuple, b: LandmarkTuple) => [0, 1, 2].map(i => b[i] - a[i]);
 const cosine = (a: number[], b: number[]) => {
   const lengths = Math.hypot(...a) * Math.hypot(...b);
-  return lengths < 1e-8 ? null : Math.max(-1, Math.min(1, a.reduce((sum, v, i) => sum + v * b[i], 0) / lengths));
+  if (!Number.isFinite(lengths) || lengths < 1e-8) return null;
+  const value = a.reduce((sum, v, i) => sum + v * b[i], 0) / lengths;
+  return Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : null;
 };
 // Elbow, shoulder, hip and knee angles; arms receive more weight.
 const ANGLES = [[11, 13, 15, 2], [12, 14, 16, 2], [23, 11, 13, 2], [24, 12, 14, 2], [11, 23, 25, 1], [12, 24, 26, 1], [23, 25, 27, 1], [24, 26, 28, 1]];
 const BONES = [[11, 13, 2], [13, 15, 2], [12, 14, 2], [14, 16, 2], [23, 25, 1], [25, 27, 1], [24, 26, 1], [26, 28, 1]];
 
-export function comparePoses(target: LandmarkTuple[], live: LandmarkTuple[] | null): number | null {
-  if (!live || live.length !== 33 || target.length !== 33) return null;
+export interface PoseComparison {
+  similarity: number | null;
+  reason: string;
+  matchedJoints: number[];
+  components: { kind: 'angle' | 'direction'; joints: number[]; similarity: number; weight: number }[];
+}
+
+export function analyzePose(target: LandmarkTuple[], live: LandmarkTuple[] | null): PoseComparison {
+  const result: PoseComparison = { similarity: null, reason: 'insufficient_pose_data', matchedJoints: [], components: [] };
+  if (!live || live.length !== 33 || target.length !== 33) return result;
   const mutual = (i: number) => visible(target[i]) && visible(live[i]);
-  if (!TORSO.every(mutual) || GAMEPLAY_JOINTS.filter(mutual).length < 6) return null;
-  if (!normalizePose(live, 1, 1) || !normalizePose(target, 1, 1)) return null;
+  result.matchedJoints = GAMEPLAY_JOINTS.filter(mutual);
+  // A partial body must not earn a full-body score by dropping mismatched limbs.
+  if (result.matchedJoints.length !== GAMEPLAY_JOINTS.length) { result.reason = 'incomplete_body'; return result; }
+  result.reason = 'invalid_geometry';
+  if (!normalizePose(live, 1, 1) || !normalizePose(target, 1, 1)) return result;
   let sum = 0, weights = 0, angleCount = 0, boneCount = 0;
   for (const [a, b, c, weight] of ANGLES) {
     if (![a, b, c].every(mutual)) continue;
     const t = cosine(vector(target[b], target[a]), vector(target[b], target[c]));
     const l = cosine(vector(live[b], live[a]), vector(live[b], live[c]));
     if (t === null || l === null) continue;
-    sum += Math.max(0, Math.cos(Math.acos(t) - Math.acos(l))) * weight;
+    const similarity = Math.max(0, Math.cos(Math.acos(t) - Math.acos(l)));
+    result.components.push({ kind: 'angle', joints: [a, b, c], similarity, weight });
+    sum += similarity * weight;
     weights += weight; angleCount++;
   }
   // Directions distinguish raised/lowered straight limbs with identical elbow angles.
@@ -44,7 +59,16 @@ export function comparePoses(target: LandmarkTuple[], live: LandmarkTuple[] | nu
     if (![a, b].every(mutual)) continue;
     const c = cosine(vector(target[a], target[b]), vector(live[a], live[b]));
     if (c === null) continue;
-    sum += Math.max(0, c) * weight; weights += weight; boneCount++;
+    const similarity = Math.max(0, c);
+    result.components.push({ kind: 'direction', joints: [a, b], similarity, weight });
+    sum += similarity * weight; weights += weight; boneCount++;
   }
-  return angleCount >= 2 && boneCount >= 2 ? sum / weights : null;
+  // Every required component must be usable; otherwise collapsed limbs could
+  // disappear from the average just like low-confidence limbs did.
+  if (angleCount === ANGLES.length && boneCount === BONES.length) { result.similarity = sum / weights; result.reason = 'comparable'; }
+  return result;
+}
+
+export function comparePoses(target: LandmarkTuple[], live: LandmarkTuple[] | null): number | null {
+  return analyzePose(target, live).similarity;
 }

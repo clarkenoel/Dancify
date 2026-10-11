@@ -45,14 +45,24 @@ export function useGame(bundle: Bundle, mode: Mode) {
   const sample = useCallback((sample: PoseSample) => {
     const session = engine.current;
     session?.tick(videoRef.current?.currentTime ?? 0);
-    session?.sample(sample.time, sample.epoch, sample.pose);
-  }, []);
+    session?.sample(sample.time, sample.epoch, sample.pose, { raw: sample.raw, inferenceMs: sample.inferenceMs });
+    refresh();
+  }, [refresh]);
   const stopForCameraChange = useCallback(() => {
     videoRef.current?.pause(); engine.current?.pause(); refresh();
   }, [refresh]);
   const camera = useCamera(mode === 'camera', capture, sample, stopForCameraChange);
   return {
     videoRef, snapshot, error, camera, wearable,
+    movementLog: engine.current?.movementLog,
+    setRecording: (enabled: boolean) => { engine.current?.movementLog.setEnabled(enabled); refresh(); },
+    clearLog: () => { engine.current?.movementLog.clear(); refresh(); },
+    downloadLog: () => {
+      if (!engine.current) return;
+      const url = URL.createObjectURL(new Blob([JSON.stringify(engine.current.diagnostics(bundle.id), null, 2)], { type: 'application/json' }));
+      const link = document.createElement('a'); link.href = url; link.download = `dancify-movement-${engine.current.snapshot().sessionId}.json`;
+      link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
     toggle: () => controller.current?.toggle().catch(e => setError(e.message)),
     replay: () => controller.current?.replay().catch(e => setError(e.message)),
     hit: () => { engine.current?.tick(videoRef.current?.currentTime ?? 0); engine.current?.keyboardHit(); refresh(); },

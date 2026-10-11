@@ -10,6 +10,8 @@ const outbox = new ResultOutbox(api, localStorage);
 const message = (e: unknown) => e instanceof Error ? e.message : 'Unexpected error';
 
 export default function App() {
+  const [screen, setScreen] = useState<'main' | 'library'>('main');
+  const [roundEnded, setRoundEnded] = useState(false);
   const [songs, setSongs] = useState<Song[]>([]);
   const [selected, setSelected] = useState('');
   const [bundle, setBundle] = useState<Bundle | null>(null);
@@ -76,6 +78,11 @@ export default function App() {
     request.current?.abort(); setSelected(song.id); setBundle(null); setLoading(false); setError('');
     if (song.status === 'ready') void load(song.id);
   };
+  const leaveGame = (destination: 'main' | 'library') => {
+    request.current?.abort(); setSelected(''); setBundle(null); setLoading(false);
+    setHistory([]); setError(''); setScreen(destination); setRoundEnded(false);
+    window.scrollTo(0, 0);
+  };
   const active = songs.find(s => s.id === selected);
   const job = preparation.job;
   const activeJob = job && (job.status === 'queued' || job.status === 'processing');
@@ -83,7 +90,9 @@ export default function App() {
     <h1>Dancify</h1>
     <p>Development interface — visual components will be connected to the same game logic when the designs arrive.</p>
     {error && <p role="alert">{error}</p>}
-    <section aria-label="Prepare a song"><h2>Prepare a song</h2>
+    {!bundle && <h2>{screen === 'main' ? 'Main menu' : 'Choose a song'}</h2>}
+    {!bundle && screen === 'library' && <button onClick={() => leaveGame('main')}>Main menu</button>}
+    <section hidden={!!bundle || screen === 'library'} aria-label="Prepare a song"><h2>Prepare a song</h2>
       <form onSubmit={create}>
         <p><label>Song title <input required maxLength={256} value={title} onChange={e => setTitle(e.target.value)} /></label></p>
         <p><label>Source <select aria-label="Source" value={source} onChange={e => setSource(e.target.value as 'url' | 'upload')}><option value="url">Video URL</option><option value="upload">Upload video with music</option></select></label></p>
@@ -104,19 +113,19 @@ export default function App() {
         {preparation.error && <p role="alert">Polling stopped: {preparation.error} <button onClick={() => preparation.watch(job)}>Reconnect to preparation</button></p>}
       </section>}
     </section>
-    <section aria-label="Song library"><h2>Songs</h2>
+    <section hidden={!!bundle} aria-label="Song library"><h2>Songs</h2>
       <button onClick={() => void act(refresh)} disabled={busy}>Refresh songs</button>
       <ul>{songs.map(song => <li key={song.id}><button aria-pressed={selected === song.id} onClick={() => select(song)}>{song.title}</button> — {song.status}{song.status === 'ready' && (!song.has_report || !song.active_bundle_id) ? ' (needs regeneration)' : ''}</li>)}</ul>
       {active && <p><button disabled={busy || !!activeJob} onClick={() => void act(async () => preparation.watch(await api.prepare(active.id, options())))}>Prepare selected song / new range</button>{' '}
         <button disabled={loading || active.status !== 'ready'} onClick={() => void load(active.id)}>Load latest prepared bundle</button></p>}
       {loading && <p role="status">Loading prepared bundle…</p>}
     </section>
-    {bundle && <><label>Game mode <select value={mode} onChange={e => setMode(e.target.value as Mode)}><option value="keyboard_practice">Keyboard practice</option><option value="camera">Camera scoring</option></select></label>
-      <GamePanel key={`${bundle.id}:${mode}`} bundle={bundle} mode={mode} outbox={outbox} onResult={() => setPending(outbox.list())} /></>}
-    <section aria-label="Pending results"><h2>Pending results</h2>
+    {bundle && <><label hidden={roundEnded}>Game mode <select value={mode} onChange={e => setMode(e.target.value as Mode)}><option value="keyboard_practice">Keyboard practice</option><option value="camera">Camera scoring</option></select></label>
+      <GamePanel key={`${bundle.id}:${mode}`} bundle={bundle} mode={mode} outbox={outbox} onResult={() => setPending(outbox.list())} onChooseSong={() => leaveGame('library')} onMainMenu={() => leaveGame('main')} onEndedChange={setRoundEnded} /></>}
+    <section hidden={!!bundle} aria-label="Pending results"><h2>Pending results</h2>
       {pending.length === 0 ? <p>No unsaved results.</p> : pending.map(item => <p key={item.result.client_session_id}>{item.result.player_name}: {item.result.score} ({item.result.mode}){' '}
         <button disabled={sending === item.result.client_session_id} onClick={() => { setSending(item.result.client_session_id); void act(async () => { await outbox.send(item); setPending(outbox.list()); }).finally(() => setSending(null)); }}>Retry pending result</button></p>)}
     </section>
-    {selected && <section aria-label="Play history"><h2>Play history</h2><ul>{history.map(play => <li key={play.id}>{play.player_name}: {play.score} · {play.mode || 'camera'} · {play.played_at}</li>)}</ul></section>}
+    {selected && !bundle && <section aria-label="Play history"><h2>Play history</h2><ul>{history.map(play => <li key={play.id}>{play.player_name}: {play.score} · {play.mode || 'camera'} · {play.played_at}</li>)}</ul></section>}
   </main>;
 }

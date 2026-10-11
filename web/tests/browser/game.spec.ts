@@ -12,12 +12,23 @@ test.beforeAll(() => {
   if (!existsSync(cameraFixture)) execFileSync('ffmpeg', ['-nostdin', '-y', '-loglevel', 'error', '-i', source, '-t', '15', '-vf', 'scale=320:180,fps=10', '-pix_fmt', 'yuv420p', cameraFixture]);
 });
 
-test('real bundle decodes, pauses, seeks, replays, scores and saves exactly once after a lost response', async ({ page, request }) => {
+test('round ends with an immediate score and navigation even when history fails', async ({ page, request }) => {
   const songs = await (await request.get(`${api}/songs`)).json();
   const song = songs.find((s: { status: string; active_bundle_id: string }) => s.status === 'ready' && s.active_bundle_id);
   expect(song, 'Seed the isolated backend before browser integration tests').toBeTruthy();
   const pageErrors: string[] = [];
   page.on('pageerror', e => pageErrors.push(e.message));
+  const savedIds: string[] = [];
+  let releaseSave!: () => void;
+  const heldResponse = new Promise<void>(resolve => { releaseSave = resolve; });
+  await page.route(`**/songs/${song.id}/plays`, async route => {
+    if (route.request().method() !== 'POST') { await route.continue(); return; }
+    savedIds.push(route.request().postDataJSON().client_session_id);
+    const response = await route.fetch();
+    if (savedIds.length === 1) { await route.abort('failed'); return; }
+    if (savedIds.length === 2) await heldResponse;
+    await route.fulfill({ response });
+  });
   await page.goto('/');
   await page.getByRole('button', { name: song.title, exact: true }).click();
   const game = page.getByRole('region', { name: 'Game', exact: true });
@@ -31,40 +42,49 @@ test('real bundle decodes, pauses, seeks, replays, scores and saves exactly once
   expect(await video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeCloseTo(paused, 1);
   await video.evaluate((v: HTMLVideoElement) => { v.currentTime = 3; });
   await expect(page.getByText('This is a practice segment.', { exact: false })).toBeVisible();
-  await game.getByRole('button', { name: 'Replay from beginning' }).click();
-  await expect(page.getByText('This is a practice segment.', { exact: false })).toHaveCount(0);
+  await game.getByRole('button', { name: 'Replay round' }).click();
   await video.evaluate((v: HTMLVideoElement) => { v.playbackRate = 8; });
   await page.evaluate(() => {
     const timer = setInterval(() => {
       const v = document.querySelector<HTMLVideoElement>('video[aria-label="Reference video"]')!;
       if (v.ended) { clearInterval(timer); return; }
-      document.querySelector<HTMLButtonElement>('section[aria-label="Game"] button')?.blur();
+      (document.activeElement as HTMLElement)?.blur();
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter' }));
     }, 15);
   });
-  await expect(page.getByRole('heading', { name: 'Session complete' })).toBeVisible({ timeout: 20000 });
-  await expect(page.getByLabel('Score', { exact: true })).not.toContainText('Score: 0 ·');
-  await page.getByLabel('Player name').fill('browser-idempotency');
-  let dropped = false;
-  await page.route(`**/songs/${song.id}/plays`, async route => {
-    if (route.request().method() === 'POST' && !dropped) {
-      dropped = true; await route.fetch(); await route.abort('failed');
-    } else await route.continue();
-  });
-  await page.getByRole('button', { name: 'Save result', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Retry saving result' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Retry saving result' }).click();
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeDisabled();
+  const results = page.getByRole('region', { name: 'Results', exact: true });
+  await expect(results).toBeVisible({ timeout: 20000 });
+  await expect(page.getByLabel('Final score')).not.toHaveText('Final score: 0');
+  await expect(results.getByRole('button')).toHaveText(['Play again', 'Choose another song', 'Main menu']);
+  await expect(page.getByRole('button', { name: /Save result|Retry saving result/ })).toHaveCount(0);
+  await expect.poll(() => savedIds.length).toBe(1);
   const plays = await (await request.get(`${api}/songs/${song.id}/plays`)).json();
-  const latest = plays.find((p: { player_name: string }) => p.player_name === 'browser-idempotency');
-  expect(plays.filter((p: { client_session_id: string }) => p.client_session_id === latest.client_session_id)).toHaveLength(1);
-  expect(latest.mode).toBe('keyboard_practice');
-  expect(latest.bundle_id).toBe(song.active_bundle_id);
+  expect(plays.filter((p: { client_session_id: string }) => p.client_session_id === savedIds[0])).toHaveLength(1);
+  await results.getByRole('button', { name: 'Play again' }).click();
+  await expect(results).toHaveCount(0);
+  await expect(page.getByLabel('Score', { exact: true })).toContainText('Score: 0 ·');
+  await expect(results).toBeVisible({ timeout: 20000 });
+  await expect.poll(() => savedIds.length).toBe(2);
+  try {
+    await results.getByRole('button', { name: 'Choose another song' }).click();
+    await expect(page.getByRole('heading', { name: 'Choose a song', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Reference video')).toHaveCount(0);
+  } finally { releaseSave(); }
+  await page.getByRole('button', { name: song.title, exact: true }).click();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(2);
+  await video.evaluate((v: HTMLVideoElement) => { v.playbackRate = 8; });
+  await game.getByRole('button', { name: 'Play / pause', exact: true }).click();
+  await expect(results).toBeVisible({ timeout: 20000 });
+  await results.getByRole('button', { name: 'Main menu', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Main menu', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Prepare a song' })).toBeVisible();
+  await expect(game).toHaveCount(0);
+  expect(new Set(savedIds).size).toBe(savedIds.length);
   expect(pageErrors).toEqual([]);
 });
 
 test('official local model renders the dancer skeleton, switches cameras and cleans up', async ({ browser, request }) => {
-  test.setTimeout(90000);
+  test.setTimeout(150000);
   // A real media fixture through getUserMedia, not mocked landmarks or a physical camera.
   const context = await browser.newContext({ permissions: ['camera'] });
   const page = await context.newPage();
@@ -80,14 +100,31 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   const skeleton = page.getByRole('img', { name: 'Tracked body skeleton', exact: true });
   await expect.poll(() => skeleton.evaluate((c: HTMLCanvasElement) => c.width)).toBeGreaterThan(0);
   await expect(page.getByLabel('Camera target pose')).toBeVisible();
-  const referenceBox = await page.getByLabel('Reference video').boundingBox();
-  const webcamBox = await page.getByLabel('Webcam preview').boundingBox();
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download movement log' }).click();
+  const download = await downloading;
+  const stream = await download.createReadStream();
+  const chunks = []; for await (const chunk of stream!) chunks.push(chunk);
+  const log = JSON.parse(Buffer.concat(chunks).toString());
+  expect(log.version).toBe('movement-log-v1');
+  expect(log.samples.length).toBeGreaterThan(0);
+  expect(log.samples[0].imageBody.map((j: { index: number }) => j.index)).toEqual([11,12,13,14,15,16,23,24,25,26,27,28]);
+  await page.getByRole('checkbox', { name: 'Record body movements locally' }).uncheck();
+  await page.getByRole('button', { name: 'Clear movement log' }).click();
+  await expect(page.getByText('Samples: 0 ·', { exact: false })).toBeVisible();
+  // Read both rectangles in one frame: live status text can change scroll anchoring.
+  const [referenceBox, webcamBox] = await page.evaluate(() => ['Reference video', 'Webcam preview'].map(label => {
+    const rect = document.querySelector(`[aria-label="${label}"]`)!.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  }));
   expect(webcamBox!.x).toBeGreaterThanOrEqual(referenceBox!.x + referenceBox!.width);
   expect(Math.abs(webcamBox!.y - referenceBox!.y)).toBeLessThan(2);
   await page.getByLabel('Practice video feeds').screenshot({ path: test.info().outputPath('side-by-side.png') });
   await page.setViewportSize({ width: 390, height: 844 });
-  const narrowReference = await page.getByLabel('Reference video').boundingBox();
-  const narrowCamera = await page.getByLabel('Webcam preview').boundingBox();
+  const [narrowReference, narrowCamera] = await page.evaluate(() => ['Reference video', 'Webcam preview'].map(label => {
+    const rect = document.querySelector(`[aria-label="${label}"]`)!.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  }));
   expect(narrowCamera!.y).toBeGreaterThan(narrowReference!.y + narrowReference!.height);
   expect(narrowCamera!.x + narrowCamera!.width).toBeLessThanOrEqual(390);
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -126,7 +163,7 @@ test('browser upload runs real preparation and loads the resulting immutable vid
   await page.getByLabel('Video file').setInputFiles(source);
   await page.getByLabel('End time').fill('8');
   await page.getByRole('button', { name: 'Create and prepare' }).click();
-  await expect(page.getByRole('region', { name: 'Preparation progress' })).toContainText('succeeded', { timeout: 120000 });
+  await expect(page.getByRole('region', { name: 'Game', exact: true })).toBeVisible({ timeout: 120000 });
   await expect(page.getByRole('region', { name: 'Game', exact: true }).getByRole('heading', { name: title, exact: true })).toBeVisible();
   await expect.poll(() => page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(2);
   const songs = await (await request.get(`${api}/songs`)).json();

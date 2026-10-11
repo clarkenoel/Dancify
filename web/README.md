@@ -47,8 +47,12 @@ Existing data in `backend/data/` was preserved.
 4. Use keyboard practice, or select camera scoring and enable the camera. All
    camera frames remain local. The preview is mirrored; inference is unmirrored.
 5. Play the reference video. Its embedded audio and `currentTime` own playback.
-   No separate audio element runs. Save a completed result; failed saves are
-   retained in browser storage and can be safely retried with the same session ID.
+   No separate audio element runs. At video end the final score is shown immediately,
+   with Play again, Choose another song, and Main menu actions. There is no save
+   button or player-name form. Complete rounds are recorded as anonymous in play
+   history in the background. Network/storage errors never block the score or
+   navigation. Failed requests remain in the existing pending outbox when local
+   storage is available; the main menu exposes its diagnostic retry controls.
 
 Keyboard: Space toggles playback, R replays, left/right seek, and Enter hits a
 checkpoint in keyboard practice. Inputs/buttons retain normal keyboard behavior.
@@ -67,8 +71,8 @@ camera. Backgrounding the tab pauses the reference video.
   windows or previous pause/seek epochs are discarded.
 - Apply Python's x/z aspect-ratio scaling and hip/torso normalization using actual
   inference-frame dimensions. Golden portrait/landscape fixtures are shared.
-- Require visible shoulders/hips and at least six mutually visible gameplay joints
-  at confidence >=0.35. Invalid geometry yields `null` / LOST, not zero / MISS.
+- Require all 12 mutually visible gameplay joints for scoring
+  at confidence >=0.35. Preview normalization can still use a partial body. Invalid geometry yields `null` / LOST, not zero / MISS.
 - Weighted joint-angle and limb-direction similarities favor arms. Provisional
   thresholds: PERFECT >=0.94, SUPER >=0.85, GOOD >=0.70; otherwise MISS.
 - Points: 1000/700/400/0. LOST awards no points and breaks combo but remains a
@@ -140,9 +144,9 @@ for another installation. The test runner starts Vite when needed. Stop any
 existing Vite instance using a different API before running the suite.
 
 The browser suite verifies real MP4 decoding, pause/seek/replay, keyboard scoring,
-an ambiguous save retry, local MediaPipe inference and camera cleanup, real upload
-preparation, and the provider-failure fallback UI. Only the download failure UI
-test mocks the API. Unit tests verify pose parity, invalid charts, lost tracking,
+immediate end scores despite history failures, end-screen navigation, local
+MediaPipe inference and camera cleanup, real upload
+preparation, and the provider-failure fallback UI. History-failure and download-failure checks intercept API requests. Unit tests verify pose parity, invalid charts, lost tracking,
 pause/seek epochs, keyboard isolation, bundle pinning, and outbox recovery.
 
 ## Temporary timing overlay
@@ -202,3 +206,35 @@ mirrored player/skeleton feed on the right on wide screens. Both players retain
 their full image with letterboxing rather than cropping. On narrow screens they
 stack; native video fullscreen shows only that feed, so keep playback inline to
 compare both. Playback timing and scoring are unchanged.
+
+### Replay and movement diagnostics
+
+Use **Replay round** during play or **Play again** on the results screen. The R
+shortcut also starts a new session, clearing scores and movement logs.
+Download a log before replaying if you want to keep it. Seeking, changing the
+song or mode, and closing the page also discard the current log.
+
+In camera mode, **Movement diagnostics** records up to 6,000 samples in browser
+memory (oldest samples are dropped when full). Disable recording or clear the log
+at any time. **Download movement log** explicitly exports JSON containing the
+bundle/session IDs, body-only target and player coordinates, visibility,
+inference duration, scoring decisions, component similarities, and each
+checkpoint's winning sample timestamp. It contains no camera frames, face
+landmarks, face descriptors, or player names, and is not uploaded to the API.
+Dropped/cleared samples may mean a winning sample is no longer in the log.
+Stale samples from a previous epoch are excluded; recording stops at round end.
+
+Scoring version `checkpoint-v2-full-body-provisional` requires all 12 gameplay
+joints (shoulders, elbows, wrists, hips, knees, ankles) to meet the existing
+visibility threshold in both reference and player poses. Previously, omitted
+limbs could leave only matching components and inflate a partial-body comparison
+to PERFECT. Incomplete comparisons and collapsed or nonfinite limb geometry
+now return insufficient data, giving LOST when no complete comparison occurs
+in the checkpoint. Keep the whole body in view;
+reference checkpoints with obscured joints may also produce LOST.
+
+This remains static checkpoint scoring with provisional thresholds. Standing
+still can legitimately match a stationary target; no arbitrary movement penalty
+is applied. A whole-round perfect score against changing poses needs a log to
+identify whether the chart, tracking, or comparison is responsible. Movement delta
+is mean normalized joint displacement, not a calibrated activity or accuracy metric.

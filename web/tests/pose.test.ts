@@ -28,3 +28,18 @@ describe('Python/browser pose contract', () => {
     expect(comparePoses(target(), raised)).toBeLessThan(0.7);
   });
 });
+
+it('rejects collapsed limbs instead of scoring only the remaining geometry', () => {
+  const collapsed = target();
+  for (const [shoulder, elbow, wrist] of [[11, 13, 15], [12, 14, 16]]) {
+    collapsed[elbow] = [...collapsed[shoulder]];
+    collapsed[wrist] = [...collapsed[shoulder]];
+  }
+  expect(comparePoses(target(), collapsed)).toBeNull();
+  expect(comparePoses(collapsed, target())).toBeNull();
+});
+it('never produces a nonfinite similarity from finite but extreme coordinates', () => {
+  const huge = target().map(p => [p[0] * 1e160, p[1] * 1e160, p[2] * 1e160, p[3]] as [number, number, number, number]);
+  const score = comparePoses(huge, huge);
+  expect(score === null || Number.isFinite(score)).toBe(true);
+});
