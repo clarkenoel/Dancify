@@ -22,7 +22,7 @@ Source: clarkenoel/justmakeit, firmware branch, b6c40000b74b86a3325d48b059aa55cb
 1. Start a camera round. Unplug the board: the app must show disconnect and pause; no scores from continued playback.
 2. Reconnect power, wait for BLE advertisement, explicitly reconnect in the app. Gameplay must remain paused until readiness/countdown. No stale button or rotary inputs should replay.
 3. Repeat twice. Also close/reopen the app and reconnect. No automatic continuation of an old round.
-4. Confirm the chosen short feedback cue and silence during idle, countdown, pause, tracking loss and results after its one authorized cue. Firmware supports metronome/HIT, but current demo policy is being changed on the browser side.
+4. Confirm the chosen short feedback cue and silence during idle, countdown, playback, pause, tracking loss and results after its one authorized cue. Firmware supports metronome/HIT, but the current browser demo disables both by default.
 
 ## Serial fallback diagnostic (BLE disconnected)
 

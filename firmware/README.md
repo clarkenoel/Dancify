@@ -27,15 +27,16 @@ Hardware references: [Waveshare board documentation](https://www.waveshare.com/w
 1. In the firmware directory, keep `DancifyWearable.ino`, `FeedbackEngine.h`, and `Controls.h`
    together inside the `DancifyWearable` folder. Open the `.ino` in Arduino IDE.
 2. Select **ESP32S3 Dev Module**, using the Espressif ESP32 board package. The
-   local package used for the attempted build was 3.3.12. Enable **USB CDC On Boot**
+   package used for the successful target build was 3.3.12. Enable **USB CDC On Boot**
    and select **Hardware CDC and JTAG** for USB mode. Match flash/PSRAM settings to
    your board variant; this firmware does not need PSRAM. Select its COM port.
 3. Compile and upload. On first upload, use the board's BOOT/RESET procedure if
    required. Serial Monitor at 115200 should print `READY Dancify-Wearable`.
 4. Open the existing Dancify website in desktop Chrome/Edge on localhost or HTTPS.
    Use its real wearable connection action and select **Dancify-Wearable**.
-5. Rotate to move menu focus, then short-press to select. Start normal-speed
-   reference playback: the website sends tempo and phase automatically.
+5. Rotate to move menu focus, then short-press to select. The demo keeps gameplay
+   quiet and sends one short cue at results when the completed round earns stars.
+   Tempo and phase commands are used only when metronome diagnostics are enabled.
 
 Only libraries bundled with the ESP32 Arduino board package are used.
 
@@ -98,9 +99,11 @@ tests the menu beep while stopped. Without SYNC, the metronome intentionally sto
 bench commands cannot fight the game. Set `USB_COMMANDS = false` for BLE-only use.
 
 On the actual website, verify rotation direction, one activation per short press,
-no long-press activation, silence during countdown/pause/buffering/end, and silence
-after Bluetooth loss. Resume should receive a fresh configuration. Listen/measure
-over a full song and test sensor endpoints and stationary jitter.
+no long-press activation, and silence during countdown, playback, pauses, buffering
+and Bluetooth loss. A completed eligible result gets one short cue; reconnecting
+must not replay it. Test sensor endpoints and stationary jitter. If metronome
+diagnostics are enabled, also measure cadence over a full song and verify that
+resume receives a fresh tempo/phase configuration.
 
 ## Validation and limits
 

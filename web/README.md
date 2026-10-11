@@ -348,8 +348,10 @@ testing with one person in frame.
 The demo defaults to quiet wearable output: no metronome or per-hit beeps.
 One short TONE is requested at results for a completed, unseeked round earning
 at least one star (accuracy thresholds 20/35/50/65/85%). No comparable poses has
-no rating/cue. A hidden tab or disconnected device receives no delayed result cue
-on return/reconnect. Menu selection still requests the existing short TONE.
+no rating/cue. Results show the earned `N / 5 stars` beside the score; a practice
+segment or insufficient tracking shows an explanation instead. A hidden tab or
+disconnected device receives no delayed result cue on return/reconnect. Menu
+selection still requests the existing short TONE.
 
 The supplied Scroll 3, ButtonClick and Miss1 assets play through the computer's
 speakers for menu movement, activation and new MISS judgments during active play.

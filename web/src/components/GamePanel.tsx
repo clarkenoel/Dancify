@@ -19,6 +19,7 @@ export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onR
   const game = useGame(bundle, wearable, confirmation !== null || tools !== null);
   const openTools = (screen: 'settings' | 'developer') => { game.pause(); setTools(screen); };
   const s = game.snapshot;
+  const finalStars = starRating(s.accuracy, s.ended, s.seeked);
   const [volume, setVolume] = useState(1);
   const confirm = (action: 'restart' | 'library' | 'main') => { game.pause(); setConfirmation(action); };
   const [showTargetSkeleton, setShowTargetSkeleton] = useState(false);
@@ -48,11 +49,10 @@ export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onR
     // Mark every completed session, even if disconnected/hidden, so reconnecting
     // or returning to the tab cannot replay an old celebration.
     announcedResult.current = s.sessionId;
-    const stars = starRating(s.accuracy, s.ended, s.seeked);
-    if (stars !== null && stars > 0 && !document.hidden && wearable.snapshot().status === 'connected') {
+    if (finalStars !== null && finalStars > 0 && !document.hidden && wearable.snapshot().status === 'connected') {
       wearable.selectionFeedback();
     }
-  }, [s.ended, s.sessionId, s.accuracy, s.seeked, wearable]);
+  }, [s.ended, s.sessionId, finalStars, wearable]);
   useEffect(() => {
     if (!s.ended || s.seeked || recorded.current === s.sessionId) return;
     recorded.current = s.sessionId;
@@ -70,6 +70,9 @@ export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onR
     {s.ended && <section className="results-panel panel" aria-label="Results" ref={resultsRef} tabIndex={-1}>
       <p className="eyebrow">That’s a wrap</p><h2>Session complete</h2>
       <p className="final-score" aria-label="Final score"><strong>Final score: {s.score}</strong></p>
+      <p className="final-score star-rating" aria-label="Star rating">{finalStars === null
+        ? s.seeked ? 'No rating for a practice segment' : 'Not enough tracking for a rating'
+        : <strong>{finalStars} / 5 stars</strong>}</p>
       <p>Best combo: {s.maxCombo} · Accuracy: {s.accuracy === null ? 'No comparable poses' : `${(s.accuracy * 100).toFixed(1)}%`}</p>
       <p>{Object.entries(s.judgments).map(([j, n]) => `${j}: ${n}`).join(' · ')}</p>
       {s.seeked && <p>Practice segment — replay from the beginning for a complete round.</p>}

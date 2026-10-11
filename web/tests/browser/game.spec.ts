@@ -404,6 +404,8 @@ test('camera-only BLE stays quiet, disconnect pauses, and a completed rating cue
   // This real recorded dancer must earn the approved first-star threshold.
   // There is no fabricated score or threshold override in this test.
   expect(log.snapshot.accuracy).toBeGreaterThanOrEqual(0.20);
+  const earnedStars = [0.20, 0.35, 0.50, 0.65, 0.85].filter(threshold => log.snapshot.accuracy >= threshold).length;
+  await expect(page.getByLabel('Star rating', { exact: true })).toHaveText(`${earnedStars} / 5 stars`);
   const output = await commands.allTextContents();
   const tonesAfterTools = output.filter(command => command === 'TONE:880').length;
   expect(output).toContain('RUN:0');

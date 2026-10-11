@@ -111,6 +111,7 @@ button.song-choice { text-align: left; background: none; color: var(--text); bor
 .results-panel .action-row { justify-content: center; }
 .results-panel .final-score { font-size: var(--display); color: var(--yellow); }
 .results-panel .final-score strong { font-weight: 400; }
+.results-panel .star-rating { color: var(--aqua); }
 [aria-label='Upcoming checkpoints'] { margin-top: var(--space-8); display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-4); }
 [aria-label='Upcoming checkpoints'] h3 { width: 100%; text-align: center; }
 figure { margin: var(--space-4); }
