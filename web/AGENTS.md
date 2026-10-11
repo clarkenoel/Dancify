@@ -27,7 +27,7 @@ You are working on the game frontend only. Person B owns this directory.
 - Keyboard fallback always works.
 - Planned webcam player lock follows [`../docs/plans/webcam-player-lock.md`](../docs/plans/webcam-player-lock.md). It is not shipped: do not claim the single-person runtime preserves identity in crowds.
 - When implementing player lock, keep session face descriptors in browser memory only; never persist, upload or log them. Ambiguous identity pauses video/scoring, never silently switches players. Preserve frozen chart/BLE contracts.
-- Build `WearableClient.ts` against a fake event source (Phase 1). Real BLE swap in Phase 3.
+- WearableClient owns BLE input/output and the command simulator. Preserve the re-frozen 2026-10-11 protocol; wearableFeedback follows video time and finalized judgments without changing scores. Physical ESP32 timing remains unverified.
 
 ## Figma MCP
 

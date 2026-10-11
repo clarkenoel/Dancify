@@ -298,14 +298,15 @@ test('simulated rotary and button controls select songs and keyboard arrows shar
 
 test('BLE notifications navigate and select, and controller loss pauses until explicit fallback', async ({ page, request }) => {
   await page.addInitScript(() => {
-    const tx = new EventTarget(); const device = new EventTarget();
-    const characteristic = Object.assign(tx, { value: new DataView(new ArrayBuffer(0)), startNotifications: async () => {}, stopNotifications: async () => {} });
+    const tx = new EventTarget(); const device = new EventTarget(); let failWrite = false;
+    const characteristic = Object.assign(tx, { value: new DataView(new ArrayBuffer(0)), startNotifications: async () => {}, stopNotifications: async () => {}, writeValueWithResponse: async (_bytes: Uint8Array) => { if (failWrite) throw new Error('Injected BLE write failure'); } });
     const gatt = { connected: false, connect: async () => { gatt.connected = true; return { getPrimaryService: async () => ({ getCharacteristic: async () => characteristic }) }; }, disconnect: () => { gatt.connected = false; } };
     Object.assign(device, { gatt });
     Object.defineProperty(navigator, 'bluetooth', { configurable: true, value: { requestDevice: async () => device } });
     Object.assign(window, {
       testBleNotify: (text: string) => { const bytes = new TextEncoder().encode(text); characteristic.value = new DataView(bytes.buffer); tx.dispatchEvent(new Event('characteristicvaluechanged')); },
       testBleDisconnect: () => { gatt.connected = false; device.dispatchEvent(new Event('gattserverdisconnected')); },
+      testBleFailWrite: () => { failWrite = true; },
     });
   });
   const songs = await (await request.get(`${api}/songs`)).json();
@@ -330,4 +331,47 @@ test('BLE notifications navigate and select, and controller loss pauses until ex
   await page.getByRole('button', { name: 'Use keyboard controls' }).click();
   await page.getByRole('button', { name: 'Play / pause', exact: true }).click();
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+  // A reconnect whose initial stop write fails also pauses the active fallback round.
+  await page.evaluate(() => (window as unknown as { testBleFailWrite: () => void }).testBleFailWrite());
+  await page.getByRole('button', { name: 'Connect ESP32', exact: true }).click();
+  await expect(page.getByText('Injected BLE write failure', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Use keyboard controls' })).toBeVisible();
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+});
+
+test('simulated output follows real playback, practice judgment, results, replay and reconnect', async ({ page, request }) => {
+  test.setTimeout(60000);
+  const songs = await (await request.get(`${api}/songs`)).json();
+  const song = songs.find((s: { status: string }) => s.status === 'ready');
+  const chart = await (await request.get(`${api}/songs/${song.id}/bundles/${song.active_bundle_id}/chart`)).json();
+  await page.goto('/');
+  await page.getByText('Controller connection and testing', { exact: true }).click();
+  await page.getByRole('button', { name: 'Connect simulated ESP32' }).click();
+  await page.getByText(/Wearable command monitor/).click();
+  const commands = page.getByRole('list', { name: 'Wearable commands' }).locator('code');
+  await expect(commands).toHaveText(['RUN:0']);
+  await page.getByRole('button', { name: song.title, exact: true }).click();
+  await expect(commands.last()).toHaveText('TONE:880');
+  const video = page.getByLabel('Reference video');
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(2);
+  await page.getByRole('button', { name: 'Clear commands' }).click();
+  await page.getByRole('button', { name: 'Play / pause', exact: true }).click();
+  await expect(commands.filter({ hasText: /^RUN:1$/ })).toHaveCount(1);
+  const first = chart.moves[0];
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime), { intervals: [20] }).toBeGreaterThan(first.start);
+  await page.getByRole('button', { name: 'Hit checkpoint', exact: true }).click();
+  await expect(commands.filter({ hasText: /^HIT:1$/ })).toHaveCount(1, { timeout: 10000 });
+  await expect(page.getByRole('region', { name: 'Results', exact: true })).toBeVisible({ timeout: 15000 });
+  await expect(commands.last()).toHaveText('RUN:0');
+  await page.getByRole('button', { name: 'Clear commands' }).click();
+  await page.getByRole('button', { name: 'Play again', exact: true }).click();
+  await expect(page.getByRole('status', { name: 'Replay countdown' })).toHaveText('Get ready — 3');
+  await expect(commands.filter({ hasText: /^RUN:1$/ })).toHaveCount(0);
+  await expect(commands.filter({ hasText: /^RUN:1$/ })).toHaveCount(1, { timeout: 6000 });
+  await page.getByRole('button', { name: 'Disconnect ESP32', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Use keyboard controls' })).toBeVisible();
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await page.getByRole('button', { name: 'Connect simulated ESP32' }).click();
+  await expect(commands.last()).toHaveText('RUN:0');
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
 });

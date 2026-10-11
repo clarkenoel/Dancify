@@ -5,7 +5,7 @@ You are working on the ESP32 wearable only. Person C owns this directory.
 ## Scope
 
 - Arduino C++ only. Do not touch `/web`, `/pipeline`, or `/schema`.
-- BLE messages must match `../schema/wearable.protocol.md` exactly. Its rotary/output revision is authorized in `../docs/handoffs/wearable-output-rfc.md`, but proposed new commands are not the wire contract until the protocol revision is completed.
+- BLE messages must match `../schema/wearable.protocol.md` exactly. The 2026-10-11 rotary/output revision is re-frozen: implement RUN, seconds-until-next-beat timing, disconnect silence and the 15-second SYNC fail-safe. See `../docs/handoffs/wearable-output-rfc.md` for browser acceptance and physical tests still required.
 
 ## Rules
 

@@ -42,7 +42,12 @@ rotation in both directions, selection, rapid inputs and 60 stationary seconds.
 Disconnect during playback and countdown: the game must pause and offer explicit
 keyboard fallback. Reconnect without restarting the page; reconnect must not
 start playback automatically. Simulator/browser mocks do not validate radio
-reliability. Browser-to-device beat/piezo output still needs implementation.
+reliability. Browser output uses the revised 2026-10-11 protocol; old firmware
+without RUN is incompatible. Validate normal playback beats, one triple-click per
+successful finalized checkpoint, silent MISS/LOST, selection tone, pause/countdown/
+results silence, and clean replay/seek resynchronization. Test loss of SYNC for
+15 seconds and BLE disconnect silence. Measure audible phase and 60-second drift;
+software logs cannot establish the physical timing target.
 
 ## Identity gate (future runtime; not available in the game yet)
 
@@ -61,3 +66,22 @@ reliability. Browser-to-device beat/piezo output still needs implementation.
 These tests are acceptance work for the team on physical equipment. Automated
 tests cover software behavior but do not establish real recognition accuracy,
 physical webcam recovery, Bluetooth reliability or scoring calibration.
+
+
+## Feedback simulator (before hardware)
+
+1. Open Controller connection and testing, connect the simulated ESP32 and expand
+   Wearable command monitor. Expect RUN:0; no automatic playback or score change.
+2. Choose a prepared song, play at normal speed, and inspect RUN:0, BPM, BEAT,
+   RUN:1. A SYNC arrives about every five video seconds while beats remain.
+3. In Keyboard practice, press Hit checkpoint during a checkpoint window. Expect
+   one HIT after it closes; no repeated HIT when the score display refreshes.
+   Repeat with camera mode and real motion; controls cannot supply camera scores.
+4. Pause, hide the tab, stop the camera, or leave the body frame: expect stop and
+   no stale hit burst on resumption. At results expect RUN:0. Play again must keep
+   feedback stopped during countdown and configure it after playback starts.
+5. Disconnect during play, then reconnect: video must stay paused. Verify the
+   explicit keyboard fallback still works. Clear commands only clears the monitor.
+
+Record any failure with song/bundle, mode and video time. Simulator commands stay
+in memory (last 200); they are not physical piezo or scoring-accuracy measurements.

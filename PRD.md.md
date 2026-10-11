@@ -134,10 +134,10 @@ for lifecycle rules, phases W1–W6, acceptance gates and unresolved model choic
 - For continuous-angle sensors, handle wraparound without a large false jump. For limited-travel sensors, define endpoint behavior after hardware selection; do not assume endless rotation.
 - Debounce the single button. Rotation moves menu focus or scrolls the focused list; button press selects/confirms. Keep the focused item visible. There is no cursor to steer.
 - Two BLE characteristics:
-  - **RX** (browser → ESP32, write): `BPM:120`, `BEAT:0.5`, `HIT:1`, `TONE:880`, `SYNC:0.512`.
-  - **TX** (ESP32 → browser, notify): rotary navigation steps and single-button actions. The wire encoding for rotary steps is pending an interface decision; see §5.2. Existing `BTN:DOWN|UP|CLICK|HOLD` messages remain the button contract.
-- **Piezo driven via the LEDC peripheral, not `tone()`.** LEDC is a hardware timer — no CPU involvement during playback, no jitter from BLE preemption.
-- **Piezo timing:** browser sends `BPM` and initial `BEAT` phase once. ESP32 fires on its own hardware timer. Browser sends `SYNC` every ~5 seconds; ESP32 slews its offset (does not jump).
+  - **RX** (browser → ESP32, write): `RUN:0`, `BPM:120`, `BEAT:0.5`, `RUN:1`, `HIT:1`, `TONE:880`, `SYNC:0.512`.
+  - **TX** (ESP32 → browser, notify): rotary navigation steps and single-button actions. Clockwise sends `DIR:DOWN`; counterclockwise sends `DIR:UP`; see §5.2. Existing `BTN:DOWN|UP|CLICK|HOLD` messages remain the button contract.
+- **Piezo driven via the LEDC peripheral, not `tone()`.** LEDC generates the waveform; firmware still schedules envelopes. BLE latency and envelope timing require physical measurement.
+- **Piezo timing:** browser configures BPM/BEAT and explicitly enables RUN on each playback start/resume. ESP32 schedules envelopes without blocking and uses LEDC for the waveform. SYNC every ~5 reference-video seconds slews phase; pause/end request RUN:0. See §5.2 for fail-safes and timing limitations.
 
 **The wearable does not contribute to scoring.** It is a coach (metronome) and a controller (menu navigation). This is a deliberate design choice.
 
@@ -195,31 +195,35 @@ hip-center origin and torso-length scale.
 **TX Characteristic UUID:** `7a2b0003-8f4c-4a6e-9b1d-3c5e7f9a0b1c` (ESP32 notifies)
 **Advertised device name prefix:** `Dancify-Wearable`
 
-**Existing frozen message formats (legacy joystick contract; rotary mapping pending):**
-- Browser → ESP32: `BPM:<int>`, `BEAT:<float>`, `HIT:1`, `TONE:<int>`, `SYNC:<float>`
-- ESP32 → browser: `JOY:<float>,<float>`, `DIR:<UP|DOWN|LEFT|RIGHT>`, `BTN:<DOWN|UP|CLICK|HOLD>`
+**Frozen feedback revision (2026-10-11):**
+- Browser → ESP32: `RUN:0|1`, `BPM:<int>`, `BEAT:<float>`, `SYNC:<float>`, `HIT:1`, `TONE:<int>`.
+- Clockwise → `DIR:DOWN` (next), counterclockwise → `DIR:UP` (previous), `BTN:CLICK` selects. Legacy JOY/edges/HOLD do not select or score.
+- All messages are UTF-8 and newline-terminated. RX requires writes with response.
 
-All messages are UTF-8 strings and **must be newline-terminated**, as required by
-the authoritative [frozen protocol](schema/wearable.protocol.md).
+**Current integration status:** browser input, ordered output and a bounded
+simulator command monitor are implemented. During normal reference playback,
+configure `RUN:0 → BPM → BEAT → RUN:1`; BEAT/SYNC mean seconds until the next
+actual chart beat, sampled from video.currentTime at dispatch. SYNC is sent about
+every five video seconds. Pause, buffering, tracking loss, countdown, hidden tab,
+results and song/mode changes silence metronome feedback; non-unit speed disables
+it. Queued stale output is discarded. A submitted BLE write cannot be recalled.
 
-**Rotary transition:** §4.3 supersedes joystick input in the product design. The
-formats above document the currently frozen interface, not a requirement to send
-joystick coordinates from the new hardware. Before firmware/web integration,
-decide whether rotary forward/back steps map to existing directional messages
-or require a reviewed protocol revision. No new wire messages, schema edits,
-firmware implementation, or sensor pin assignment are authorized by this PRD
-update alone. The single button remains; the wearable never contributes score.
+HIT follows a newly finalized GOOD/SUPER/PERFECT checkpoint while feedback is
+enabled; MISS/LOST and old results never produce catch-up hits. Keyboard practice
+remains labeled separately. There is no exact choreographic hit timestamp in the
+chart. Menu selection requests a short TONE; rotation is silent. The wearable
+never supplies scoring input or identifies its wearer.
 
-**Current integration status:** the browser receives directional/button BLE
-notifications and offers matching simulated menu controls. Browser-to-device
-beat/hit output and firmware are not implemented. The frozen protocol lacks a
-stop command, so it cannot yet express silence during pause/tracking loss/results.
-The [wearable output RFC](docs/handoffs/wearable-output-rfc.md) proposes reusing
-`DIR:DOWN`/`DIR:UP` for rotary navigation and adding an explicit output run state.
-Revision of `schema/wearable.protocol.md` for that proposal was explicitly
-authorized on 2026-10-11. The BLE document is temporarily unfrozen for this work;
-the new commands remain unimplemented and are not yet the current wire contract.
-The dance chart schema and TypeScript mirror remain frozen.
+Write failure or controller loss pauses gameplay and requires explicit reconnect
+or keyboard fallback. Reconnect never resumes automatically. Firmware must boot
+stopped, stop on disconnect, and stop after 15 seconds without SYNC while running.
+ESP32 firmware is still absent: radio reliability, audible phase, latency and
+drift require physical trials. Integer BPM and one-way phase delivery are
+approximations, not a demonstrated timing guarantee.
+
+The authorized BLE revision is now re-frozen in the authoritative
+[protocol](schema/wearable.protocol.md). Dance JSON and its TypeScript mirror
+remain unchanged and frozen. See the [implementation handoff](docs/handoffs/wearable-output-rfc.md).
 
 ---
 
@@ -385,7 +389,7 @@ it is not a completed gate or a change to the solo reference-video MVP.
 
 **Person C — Wearable:**
 - Confirm the rotary angle sensor model/interface and wire it to compatible ESP32 pins (ADC1 if analog). Wire two piezos in parallel on one GPIO through a shared 100Ω resistor and the single button on a digital pin with `INPUT_PULLUP`.
-- Agree the rotary-to-BLE mapping in §5.2 before integration. Flash firmware with nonblocking sensor sampling, filtered angle-to-step conversion, debounced button events, and the existing `BPM`/`BEAT`/`HIT`/`SYNC`/`TONE` RX commands.
+- Implement the agreed rotary-to-BLE mapping in §5.2 before integration. Flash firmware with nonblocking sensor sampling, filtered angle-to-step conversion, debounced button events, and the revised `RUN`/`BPM`/`BEAT`/`HIT`/`SYNC`/`TONE` RX commands.
 - Piezo on **LEDC peripheral**, not `tone()`.
 - Confirm timing: hardcoded 120 BPM for 60 seconds, measure drift. Target < 20ms over 60 seconds.
 - Confirm the stationary rotary control produces zero phantom navigation steps for 60 seconds. Test slow/fast rotation, reversals, and wraparound or endpoints as applicable.

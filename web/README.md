@@ -318,9 +318,9 @@ The receiver uses the UUIDs in `../schema/wearable.protocol.md`, also recorded
 in the PRD. It subscribes to TX notifications and accepts the frozen UTF-8,
 newline-terminated messages, including split/coalesced lines. DIR:DOWN/RIGHT
 advances menu focus, DIR:UP/LEFT moves backwards, and BTN:CLICK activates the
-focused item. Button edges, HOLD and JOY do not select or score. The suggested
-rotary firmware mapping is clockwise → DIR:DOWN, counterclockwise → DIR:UP;
-confirm it with the firmware teammate before flashing. No wire contract changed.
+focused item. Button edges, HOLD and JOY do not select or score. The agreed
+rotary firmware mapping is clockwise → DIR:DOWN, counterclockwise → DIR:UP.
+The 2026-10-11 feedback revision adds RUN and defines beat phase; use updated firmware.
 
 Up/Down arrows use the same ordered menu navigation. Text inputs/selects retain
 native behavior. Simulated Previous/Next/Select exercise it without an ESP32.
@@ -331,8 +331,8 @@ never automatically resumes a round or identifies the wearer.
 Physical BLE acceptance is pending: advertise the frozen service and device-name
 prefix Dancify-Wearable, test rotation/button edges, then disconnection/reconnection
 on the actual Windows demo machine. Unit/browser doubles validate software paths,
-not radio reliability. RX beat/piezo command scheduling is not implemented in this
-increment. Multi-person tracking, face-model selection/enrollment, session identity,
+not radio reliability. Browser RX beat/hit output is implemented; firmware and
+audible timing validation remain pending. Multi-person tracking, face-model selection/enrollment, session identity,
 Figma integration, and real scoring calibration remain separate acceptance gates.
 
 Use [the teammate test checklist](TEAMMATE_TEST.md) for physical Windows trials.
@@ -340,3 +340,38 @@ Use [the teammate test checklist](TEAMMATE_TEST.md) for physical Windows trials.
 candidate runtime dependencies and remaining integration gates. Its tested
 `PlayerLock` state machine is not yet connected to the live camera; continue
 testing with one person in frame.
+
+
+### Wearable output testing (no hardware needed)
+
+Open **Controller connection and testing**, click **Connect simulated ESP32**, then
+expand **Wearable command monitor**. Select a prepared song and use Keyboard
+practice or camera scoring. The simulator shows the same command queue used by
+Bluetooth; it neither plays sound nor provides score/pose data.
+
+- Playing at normal speed configures RUN:0 → BPM → BEAT → RUN:1. BEAT and periodic
+  SYNC use seconds until the next actual chart beat from reference video time.
+- Finalized GOOD/SUPER/PERFECT checkpoints send HIT:1 once. Keyboard practice is
+  explicitly labeled; MISS/LOST do not trigger hits. Feedback stops after the last
+  chart beat, at results, during countdown, on pause/buffering/tracking loss,
+  hidden tab, and song/mode change. Non-unit playback speed disables feedback.
+- Replay waits for the countdown before reconfiguring; reconnect stays paused.
+  Disconnect the simulator during play to exercise the existing keyboard fallback.
+- The monitor retains 200 successful writes in browser memory only. Clear commands
+  to isolate a test; clearing the monitor does not reset gameplay or deduplication.
+- Menu selection requests TONE:880; turning the control is silent. Obsolete queued
+  tones may be cancelled by a playback lifecycle change.
+
+Real devices must support RX writes with response and the revised protocol's RUN
+commands, disconnect silence and 15-second SYNC fail-safe. The browser sends an
+initial stop, bounds pending writes to 32, times out a write after two seconds,
+and pauses/disconnects on failure. An in-flight write cannot be recalled. Old
+firmware without RUN is incompatible even if Bluetooth connection succeeds.
+
+HIT occurs at judgment finalization, not an explicit choreography hit timestamp.
+No audible latency/drift guarantee has been verified; see the
+[wearable handoff](../docs/handoffs/wearable-output-rfc.md) for physical acceptance.
+
+Regression commands: `npm test`, `npm run build`, then from the repository root
+run `python3 -m unittest discover -s scripts/tests -v` and the documented
+`web/scripts/test-integration.sh` with a shared installed Playwright browser path.

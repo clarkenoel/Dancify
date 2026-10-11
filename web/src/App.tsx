@@ -100,7 +100,10 @@ export default function App() {
   const active = songs.find(s => s.id === selected);
   const job = preparation.job;
   const activeJob = job && (job.status === 'queued' || job.status === 'processing');
-  return <main ref={root} onKeyDown={event => {
+  return <main ref={root} onClickCapture={event => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-controller]');
+    if (button && !button.disabled && !document.hidden) wearable.selectionFeedback();
+  }} onKeyDown={event => {
     if (event.ctrlKey || event.altKey || event.metaKey || (event.target as HTMLElement).closest('input, textarea, select, video, [contenteditable="true"]')) return;
     if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
       event.preventDefault(); menu.current.move(root.current!, event.key === 'ArrowUp' ? -1 : 1);

@@ -5,11 +5,13 @@ import { PlaybackController } from '../core/playback';
 import type { PoseSample } from '../core/camera';
 import { useCamera } from './useCamera';
 import type { WearableClient } from '../core/WearableClient';
+import { WearableFeedback } from '../core/wearableFeedback';
 import { BodyReadiness } from '../core/readiness';
 import { cameraFeedback } from '../core/cameraPreview';
 
 export function useGame(bundle: Bundle, mode: Mode, wearable: WearableClient) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const feedback = useRef<WearableFeedback | null>(null);
   const engine = useRef<GameSession | null>(null);
   const controller = useRef<PlaybackController | null>(null);
   const [snapshot, setSnapshot] = useState<SessionSnapshot>(() => new GameSession(bundle.chart, mode).snapshot());
@@ -18,13 +20,14 @@ export function useGame(bundle: Bundle, mode: Mode, wearable: WearableClient) {
   const lossSince = useRef<number | null>(null);
   const controllerBlocked = useRef(false);
   const [controllerWarning, setControllerWarning] = useState('');
-  const refresh = useCallback(() => { if (engine.current) setSnapshot(engine.current.snapshot()); }, []);
+  const refresh = useCallback(() => { if (engine.current) { const next = engine.current.snapshot(); feedback.current?.update(next); setSnapshot(engine.current.snapshot()); } }, []);
   useEffect(() => {
     const session = new GameSession(bundle.chart, mode); engine.current = session;
     const video = videoRef.current!;
+    const output = new WearableFeedback(video, bundle.chart, wearable); feedback.current = output;
     const playback = new PlaybackController(video, session, refresh, setError, () => !controllerBlocked.current && (mode !== 'camera' || readiness.current.isReady(performance.now())), mode === 'camera'); controller.current = playback;
     setSnapshot(session.snapshot()); setError('');
-    const stopForBackground = () => { if (document.hidden) { readiness.current.reset(); playback.cancelCountdown(); video.pause(); } };
+    const stopForBackground = () => { if (document.hidden) { output.stop(); readiness.current.reset(); playback.cancelCountdown(); video.pause(); } };
     document.addEventListener('visibilitychange', stopForBackground);
     const unsubscribe = wearable.subscribe(event => {
       if (event.type === 'togglePlayback') void playback.toggle().catch(e => setError(e.message));
@@ -44,7 +47,7 @@ export function useGame(bundle: Bundle, mode: Mode, wearable: WearableClient) {
     };
     window.addEventListener('keydown', keyboard);
     return () => {
-      unsubscribe(); playback.dispose(); engine.current = null; controller.current = null;
+      unsubscribe(); output.dispose(); feedback.current = null; playback.dispose(); engine.current = null; controller.current = null;
       window.removeEventListener('keydown', keyboard); document.removeEventListener('visibilitychange', stopForBackground);
     };
   }, [bundle, mode, refresh, wearable]);

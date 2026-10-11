@@ -1,8 +1,9 @@
 # Pre-hardware reliability handoff
 
 Date: 2026-10-11. Working branch: `feat/codex-web-followup`.
-Delivery: feature branch only, authorized for push after local verification.
-No merge to main; the BLE protocol proposal still requires separate approval.
+Delivery: originally feature-branch-only; the user approved publication and merge
+to main on 2026-10-11 after reviewing the implementation. Tasks 4–5 have a separate
+[implementation handoff](wearable-output-rfc.md).
 
 ## Status
 
@@ -11,14 +12,14 @@ No merge to main; the BLE protocol proposal still requires separate approval.
    selected/retained/omitted counts, and fail preparation if none remain.
 2. **Complete:** independent camera inference/startup watchdog, stream cleanup,
    late-result rejection and explicit recovery. No scoring calibration change.
-3. **Complete locally:** frontend/build/launcher and real-media browser CI
-   workflow added and corresponding commands tested. Remote GitHub execution
-   and required-status branch protection remain unverified/unconfigured.
-4. **Partially complete:** corrected documented UUIDs/framing and rotary hardware
-   terminology. [Wearable output RFC](wearable-output-rfc.md) awaits product
-   approval and explicit unfreezing of the BLE protocol.
-5. **Not implemented:** browser-to-ESP32 feedback. Depends on task 4's agreed
-   stop/resume and phase semantics. The frozen schema directory is unchanged.
+3. **Complete:** web/build/launcher and real-media browser CI added. The browser
+   launch fix passed [GitHub run 38118454992](https://github.com/clarkenoel/justmakeit/actions/runs/38118454992).
+   Required-status branch protection remains a separate repository setting.
+4. **Complete:** authorized rotary/feedback protocol revision is documented and
+   re-frozen, including RUN, phase units and device fail-safes. Chart schema unchanged.
+5. **Implemented:** ordered browser-to-ESP32 output and command
+   simulator. See [wearable feedback handoff](wearable-output-rfc.md). Firmware and
+   physical audible timing acceptance remain pending.
 
 Existing earlier branch work (readiness, replay countdown, rotary menus, BLE
 input and the unconnected identity prototype) is preserved. This handoff does
@@ -42,12 +43,12 @@ not claim multi-person identity tracking or physical hardware acceptance.
 | `.github/workflows/web.yml`, `.github/workflows/backend.yml` | Automated regressions and shared-fixture trigger coverage |
 | `web/scripts/test-integration.sh`, `web/playwright.config.ts` | Fresh database, owned services, two real prepared songs, CI Chromium selection |
 | `backend/README.md`, `pipeline/README.md`, `web/README.md` | New validation behavior and reproducible verification commands |
-| `PRD.md.md`, `AGENTS.md.md`, `firmware/AGENTS.md` | Existing UUID/framing corrections, current rotary terminology, pending contract status |
-| `docs/handoffs/wearable-output-rfc.md` | Concrete proposed hardware behavior/contract for approval |
+| `PRD.md.md`, `AGENTS.md.md`, `firmware/AGENTS.md` | UUID/framing corrections, current rotary terminology and contract status |
+| `docs/handoffs/wearable-output-rfc.md` | Authorized protocol revision, browser implementation and physical hardware gate |
 
-## Verification
+## Earlier reliability-increment verification
 
-Latest completed checks all passed:
+These counts describe the earlier tasks 1–4 increment, not the current feedback changes:
 
 - Frontend: **82 tests**, TypeScript check and Vite production build.
 - Backend: **78 tests**.
