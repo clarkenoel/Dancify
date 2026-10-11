@@ -34,7 +34,7 @@ test('known poses and every real prepared checkpoint render with the shipped art
 test('artwork toggle keeps the same video, playback position and score', async ({ page, request }) => {
   const song = await readySong(request);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
+  await page.getByRole('button', { name: 'Choose video', exact: true }).click();
   await page.getByRole('button', { name: song.title, exact: true }).click();
   await expect(page.locator('[data-renderer="lenny"]').first()).toBeVisible();
   const video = page.getByLabel('Reference video');
@@ -44,13 +44,15 @@ test('artwork toggle keeps the same video, playback position and score', async (
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.seeking)).toBe(false);
   const position = await video.evaluate((v: HTMLVideoElement) => v.currentTime);
   const score = await page.getByLabel('Score', { exact: true }).textContent();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Target character').selectOption('human');
-  await expect(page.locator('[data-renderer="human"]').first()).toBeVisible();
+  await expect(page.locator('[data-renderer="human"]').first()).toBeAttached();
   await page.getByLabel('Target character').selectOption('lenny');
   const checkbox = page.getByRole('checkbox', { name: 'Show target skeleton instead of artwork' });
   await checkbox.check();
   await expect(page.locator('[data-renderer="lenny"]')).toHaveCount(0);
   await checkbox.uncheck();
+  await page.getByRole('dialog', { name: 'Settings', exact: true }).getByRole('button', { name: 'Back', exact: true }).click();
   await expect(page.locator('[data-renderer="lenny"]').first()).toBeVisible();
   expect(await node!.evaluate(n => n === document.querySelector('[aria-label="Reference video"]'))).toBe(true);
   expect(await video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(position);
@@ -62,7 +64,7 @@ test('failed artwork falls back to targets while a real camera round can still f
   const song = await readySong(request);
   await page.route('**/pictograms/lenny/*.png', route => route.abort());
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
+  await page.getByRole('button', { name: 'Choose video', exact: true }).click();
   await page.getByRole('button', { name: song.title, exact: true }).click();
   await expect(page.getByText('Artwork unavailable; showing skeleton.', { exact: false }).first()).toBeVisible();
   await expect(page.locator('[data-renderer="lenny"]')).toHaveCount(0);

@@ -6,6 +6,8 @@ import { usePreparation } from './hooks/usePreparation';
 import { GamePanel } from './components/GamePanel';
 import { WearablePanel } from './components/WearablePanel';
 import { WearableClient } from './core/WearableClient';
+import { ToolsDialog } from './components/ToolsDialog';
+import { MainMenu } from './components/MainMenu';
 import { MenuNavigation } from './core/menuNavigation';
 
 const api = new DancifyApi();
@@ -30,6 +32,14 @@ export default function App() {
     });
     return () => { unsubscribe(); wearable.disconnect(); };
   }, [wearable]);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try { return localStorage.getItem('dancify-theme') === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
+  });
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try { localStorage.setItem('dancify-theme', theme); } catch { /* Theme still works without storage. */ }
+  }, [theme]);
+  const [developerOpen, setDeveloperOpen] = useState(false);
   const [screen, setScreen] = useState<Screen>('main');
   const [songs, setSongs] = useState<Song[]>([]);
   const [selected, setSelected] = useState('');
@@ -93,7 +103,8 @@ export default function App() {
     void act(async () => {
       const range = options();
       if (source === 'upload' && (!file || file.size === 0 || file.size > 500 * 1024 * 1024)) throw new Error('Choose a nonempty video file under 500 MiB.');
-      const song = source === 'url' ? await api.createUrl(title, url) : await api.upload(title, file!);
+      const videoTitle = (title.trim() || (source === 'upload' ? file!.name.replace(/\.[^.]+$/, '') || 'Uploaded video' : `Video from ${new URL(url).hostname}`)).slice(0, 256);
+      const song = source === 'url' ? await api.createUrl(videoTitle, url) : await api.upload(videoTitle, file!);
       request.current?.abort(); setSelected(song.id); setBundle(null); setLoading(false); await refresh();
       const job = await api.prepare(song.id, { ...range, source_kind: source }); preparation.watch(job);
     });
@@ -118,31 +129,32 @@ export default function App() {
       event.preventDefault(); const scope = menuRoot(); if (scope) menu.current.move(scope, event.key === 'ArrowUp' ? -1 : 1);
     }
   }}>
-    <header className="site-header"><span className="wordmark">Dancify</span><span className="header-note">Find your rhythm</span>
-      {!bundle && screen !== 'main' && <button className="quiet" data-controller onClick={() => navigate('main')}>Main menu</button>}
+    <header className={`site-header ${!bundle && screen === 'main' ? 'design-header' : ''}`}><span className="wordmark">Dancify</span>
+      {!bundle && <button className="quiet" data-controller onClick={() => navigate('main')}>Main menu</button>}
     </header>
     {error && <div className="service-error" role="alert"><p>{error}</p><button data-controller onClick={() => void act(refresh)} disabled={busy}>Retry connection</button></div>}
     {!bundle && <div className={`page page-${screen}`}>
-      <div className="page-heading"><p className="eyebrow">{screen === 'main' ? 'The dance floor is yours' : screen === 'library' ? 'Pick your next dance' : 'Bring your own beat'}</p>
-        <h1 ref={heading} tabIndex={-1}>{screen === 'main' ? 'Main menu' : screen === 'library' ? 'Choose a song' : 'Prepare a song'}</h1>
+      <div className="page-heading">
+        <h1 ref={heading} tabIndex={-1}>{screen === 'main' ? 'Your next dance starts here' : screen === 'library' ? 'Choose a song' : 'Import a video'}</h1>
+        <p>{screen === 'main' ? 'Choose a prepared video, import a clip.' : screen === 'library' ? 'Prepared videos and their current chart status.' : 'Prepare a clip locally before playing.'}</p>
       </div>
-      {screen === 'main' && <section className="main-menu" aria-label="Main menu actions">
-        <p className="menu-intro">Your music. Your moves.</p>
-        <div className="menu-actions"><button className="primary menu-button" data-controller onClick={() => navigate('library')}>Choose a song</button>
-          <button className="menu-button" data-controller onClick={() => navigate('prepare')}>Import video</button></div>
-        <p className="menu-note">A camera, some room, and a song you love.<br />No controller needed to get started.</p>
-      </section>}
+      {screen === 'main' && <MainMenu wearable={wearable} theme={theme} onTheme={setTheme} onLibrary={() => navigate('library')} onImport={() => navigate('prepare')} />}
       <section hidden={screen !== 'prepare'} className="panel prepare-panel" aria-label="Prepare a song">
-        <form onSubmit={create}>
-          <label>Song title <input required maxLength={256} value={title} onChange={e => setTitle(e.target.value)} placeholder="Name your dance" /></label>
-          <label>Source <select aria-label="Source" value={source} onChange={e => { setSource(e.target.value as 'url' | 'upload'); setFile(null); }}><option value="url">Video URL</option><option value="upload">Upload video with music</option></select></label>
+        <form onSubmit={create} onInvalidCapture={event => {
+          const advanced = (event.target as HTMLElement).closest('details');
+          if (advanced) advanced.open = true;
+        }}>
+          <div className="action-row centered"><button type="button" className="primary" data-controller onClick={() => { setSource(source === 'url' ? 'upload' : 'url'); setFile(null); }}>{source === 'url' ? 'Upload file' : 'Use video URL'}</button></div>
           {source === 'url' ? <label key="url">Video URL <input type="url" required value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" /></label> : <label key="upload">Video file <input type="file" accept="video/*" required onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>}
           <p className="help">Choose a continuous solo-dancer clip with music. Uploading bypasses download failures; timing and tracking checks still apply.</p>
+          <details className="advanced-import"><summary>Advanced · title and clip range</summary>
+            <label>Song title <input maxLength={256} value={title} onChange={e => setTitle(e.target.value)} placeholder="Optional — defaults to the file name or source" /></label>
           <fieldset><legend>Optional choreography range (seconds)</legend><div className="field-pair">
             <label>Start time <input type="number" min="0" step="0.1" value={start} onChange={e => setStart(e.target.value)} /></label>
             <label>End time <input type="number" min="0.1" step="0.1" value={end} onChange={e => setEnd(e.target.value)} /></label>
           </div></fieldset>
-          <button className="primary wide" data-controller disabled={busy || !!activeJob}>Create and prepare</button>
+          </details>
+          <div className="action-row centered"><button className="primary" data-controller disabled={busy || !!activeJob}>Prepare video</button><button type="button" data-controller onClick={() => navigate('library')}>Back to library</button></div>
         </form>
         {job && <section className="preparation-status" aria-label="Preparation progress">
           <p role="status">Preparation: {job.status} · {job.stage}</p>
@@ -174,6 +186,7 @@ export default function App() {
       </section>}
     </div>}
     {bundle && <GamePanel key={bundle.id} bundle={bundle} wearable={wearable} outbox={outbox} onResult={() => setPending(outbox.list())} onChooseSong={() => navigate('library')} onMainMenu={() => navigate('main')} />}
-    <footer className="site-footer"><WearablePanel wearable={wearable} /><p>Camera tracking stays on this device.</p></footer>
+    {!bundle && <footer className="site-footer"><button data-controller onClick={() => setDeveloperOpen(true)}>Developer tools</button><p>Camera tracking stays on this device.</p></footer>}
+    {developerOpen && <ToolsDialog title="Developer tools" subtitle="Testing controls kept separate from the player experience." onClose={() => setDeveloperOpen(false)}><WearablePanel wearable={wearable} /><p className="help">Movement logs and chart diagnostics are available in Developer tools during a round.</p></ToolsDialog>}
   </main>;
 }

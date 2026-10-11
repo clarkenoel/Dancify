@@ -345,7 +345,7 @@ testing with one person in frame.
 
 ### Wearable output testing (no hardware needed)
 
-Open **Controller connection and testing**, click **Connect simulated ESP32**, then
+Open **Developer tools → Controller connection and testing**, click **Connect simulated ESP32**, then
 expand **Wearable command monitor**. Select a prepared song and enable the camera. The simulator shows the same command queue used by
 Bluetooth; it neither plays sound nor provides score/pose data.
 
@@ -429,3 +429,20 @@ The side-by-side feeds and expandable movement/controller diagnostics remain.
 The latest Figma canvas was unavailable during implementation. Button sizing is
 provisional; final star exports and designer comparison remain. No fabricated
 star rating or progress percentage is displayed.
+
+
+## Approved setup and developer screens
+
+- Import: **Advanced · title and clip range** holds optional naming and range
+  controls. Without a title, the filename or URL hostname provides a name.
+- During a round, **Settings** contains camera selection/refresh/stop, body
+  skeleton, music volume, target character and wearable connection.
+- **Developer tools** holds movement logs, controller connection/simulation,
+  command monitoring and chart diagnostics (including timing-overlay toggles).
+- Opening either game tools screen pauses the video and cancels the countdown.
+  Back or Escape restores focus to its launcher; press Ready to resume.
+  The media elements, game session and score are preserved.
+- Main menu dark/light selection persists locally. It does not affect scoring.
+
+See [design integration status](DESIGN_INTEGRATION.md) for approved references,
+remaining screen work and the agreed star thresholds.

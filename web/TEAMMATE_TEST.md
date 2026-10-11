@@ -23,7 +23,7 @@ delivered to the test machine; do not assume the remote branch includes them.
 | Camera recovery | Stop camera during play; separately unplug an external webcam | Playback pauses, feedback explains recovery; enabling a working camera requires readiness again |
 | Background tab | Start a countdown or round, switch tabs, then return | Playback/countdown stops; no surprise restart |
 | Camera required | Deny camera access; try Enter, Space, R and arrow keys outside controls | Retry/menu exit remain available; no keyboard practice or hit control exists, no playback or points without camera readiness |
-| Menu simulator | Open Controller connection and testing; use Previous item, Next item, Select item | Visible focus moves among enabled marked actions; selection opens the focused song/action |
+| Menu simulator | Open Developer tools → Controller connection and testing; use Previous item, Next item, Select item | Visible focus moves among enabled marked actions; selection opens the focused song/action |
 | Keyboard menus | Use Up/Down outside a text field, then Enter | Focus/selection works; typing in form fields retains normal editing |
 | Body diagnostics | Complete a moving round and a standing-still round; download each log before replay | Logs contain body sample decisions and checkpoint timestamps; compare unexpected judgments without changing thresholds yet |
 
@@ -70,7 +70,7 @@ physical webcam recovery, Bluetooth reliability or scoring calibration.
 
 ## Feedback simulator (before hardware)
 
-1. Open Controller connection and testing, connect the simulated ESP32 and expand
+1. Open Developer tools → Controller connection and testing, connect the simulated ESP32 and expand
    Wearable command monitor. Expect RUN:0; no automatic playback or score change.
 2. Choose a prepared song, play at normal speed, and inspect RUN:0, BPM, BEAT,
    RUN:1. A SYNC arrives about every five video seconds while beats remain.

@@ -24,7 +24,7 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   const songs = await (await request.get(`${api}/songs`)).json();
   const song = songs.find((s: { status: string; active_bundle_id: string }) => s.status === 'ready' && s.active_bundle_id);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
+  await page.getByRole('button', { name: 'Choose video', exact: true }).click();
   await page.getByRole('button', { name: song.title, exact: true }).click();
   await expect(page.getByLabel('Reference video')).toBeVisible();
   // Capture countdown state inside the page: separate browser round trips can
@@ -62,6 +62,7 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   const skeleton = page.getByRole('img', { name: 'Tracked body skeleton', exact: true });
   await expect.poll(() => skeleton.evaluate((c: HTMLCanvasElement) => c.width), { timeout: 20000 }).toBeGreaterThan(0);
   await expect(page.getByLabel('Camera target pose')).toBeVisible();
+  await page.getByRole('button', { name: 'Developer tools', exact: true }).click();
   await page.getByText('Movement diagnostics', { exact: true }).click();
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download movement log' }).click();
@@ -75,6 +76,7 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   await page.getByRole('checkbox', { name: 'Record body movements locally' }).uncheck();
   await page.getByRole('button', { name: 'Clear movement log' }).click();
   await expect(page.getByText('Samples: 0 ·', { exact: false })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Developer tools', exact: true }).getByRole('button', { name: 'Back', exact: true }).click();
   // Read both rectangles in one frame: live status text can change scroll anchoring.
   const [referenceBox, webcamBox] = await page.evaluate(() => ['Reference video', 'Webcam preview'].map(label => {
     const rect = document.querySelector(`[aria-label="${label}"]`)!.getBoundingClientRect();
@@ -101,9 +103,11 @@ test('official local model renders the dancer skeleton, switches cameras and cle
     await expect(page.getByLabel('Body tracking status')).toContainText(/Ready|Tracking body/, { timeout: 40000 });
   }
 
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Show body skeleton' }).uncheck();
   await expect(page.getByRole('checkbox', { name: 'Show body skeleton' })).not.toBeChecked();
   await page.getByRole('checkbox', { name: 'Show body skeleton' }).check();
+  await page.getByRole('dialog', { name: 'Settings', exact: true }).getByRole('button', { name: 'Back', exact: true }).click();
   const track = await page.getByLabel('Webcam preview').evaluateHandle((v: HTMLVideoElement) => (v.srcObject as MediaStream).getVideoTracks()[0]);
   // Give the fault-injection phase enough media time after the automatic-start
   // check. Otherwise an eight-second fixture can end before the watchdog fires.
@@ -128,9 +132,11 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   expect(await page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
   expect(await page.evaluate(() => (window as unknown as { stallInjected: boolean }).stallInjected)).toBe(true);
   await page.evaluate(() => (window as unknown as { restorePoseSend: () => void }).restorePoseSend());
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const device = await page.getByLabel('Camera device', { exact: true }).locator('option').nth(1).getAttribute('value');
   await page.getByLabel('Camera device', { exact: true }).selectOption(device!);
   expect(await track.evaluate(t => t.readyState)).toBe('ended');
+  await page.getByRole('dialog', { name: 'Settings', exact: true }).getByRole('button', { name: 'Back', exact: true }).click();
   await expect.poll(() => skeleton.evaluate((c: HTMLCanvasElement) => c.width)).toBe(0);
   expect(await page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
   await page.getByRole('button', { name: 'Enable camera' }).click();
@@ -151,13 +157,14 @@ test('browser upload runs real preparation and loads the resulting immutable vid
   const source = process.env.DANCIFY_TEST_UPLOAD_VIDEO || path.resolve('../pipeline/outputs/web-seed/jd_video_1/reference.mp4');
   expect(existsSync(source), 'Run scripts/test-integration.sh or seed with --work-dir pipeline/outputs/web-seed').toBeTruthy();
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
+  await page.getByRole('button', { name: 'Choose video', exact: true }).click();
   await page.getByRole('button', { name: 'Import video', exact: true }).click();
+  await page.getByText('Advanced · title and clip range', { exact: true }).click();
   await page.getByLabel('Song title').fill(title);
-  await page.getByLabel('Source', { exact: true }).selectOption('upload');
+  await page.getByRole('button', { name: 'Upload file', exact: true }).click();
   await page.getByLabel('Video file').setInputFiles(source);
   await page.getByLabel('End time').fill('8');
-  await page.getByRole('button', { name: 'Create and prepare' }).click();
+  await page.getByRole('button', { name: 'Prepare video' }).click();
   await expect(page.getByRole('region', { name: 'Game', exact: true })).toBeVisible({ timeout: 120000 });
   await expect(page.getByRole('region', { name: 'Game', exact: true }).getByRole('heading', { name: title, exact: true })).toBeVisible();
   await expect.poll(() => page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(2);
@@ -175,15 +182,16 @@ test('download failure offers the real upload fallback', async ({ page }) => {
   await page.route('**/songs/json', r => r.fulfill({ json: { id: 'url-song', title: 'Blocked URL', status: 'pending' } }));
   await page.route('**/songs/url-song/preparations', r => r.fulfill({ status: 202, json: { id: 'blocked', song_id: 'url-song', status: 'failed', stage: 'failed', error_code: 'download_failed', error_message: 'The provider refused this download.' } }));
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
+  await page.getByRole('button', { name: 'Choose video', exact: true }).click();
   await page.getByRole('button', { name: 'Import video', exact: true }).click();
+  await page.getByText('Advanced · title and clip range', { exact: true }).click();
   await page.getByLabel('Song title').fill('Blocked URL');
   await page.getByLabel('Video URL', { exact: true }).fill('https://www.youtube.com/watch?v=HKRlrJNT6EQ');
-  await page.getByRole('button', { name: 'Create and prepare' }).click();
+  await page.getByRole('button', { name: 'Prepare video' }).click();
   await expect(page.getByText('The source could not be downloaded.', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Use upload fallback' }).click();
   await expect(page.getByLabel('Video file')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Create and prepare' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Prepare video' })).toBeEnabled();
 });
 
 test('an older partial-body chart explains regeneration instead of starting an unscorable round', async ({ page, request }) => {
@@ -197,7 +205,7 @@ test('an older partial-body chart explains regeneration instead of starting an u
     await route.fulfill({ response, json: chart });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
+  await page.getByRole('button', { name: 'Choose video', exact: true }).click();
   await page.getByRole('button', { name: song.title, exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Prepare this song again');
   await expect(page.getByLabel('Reference video')).toHaveCount(0);
@@ -212,14 +220,14 @@ test('camera denial offers retry and menu exit without a keyboard scoring bypass
   const songs = await (await request.get(`${api}/songs`)).json();
   const song = songs.find((s: { status: string }) => s.status === 'ready');
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
+  await page.getByRole('button', { name: 'Choose video', exact: true }).click();
   await page.getByRole('button', { name: song.title, exact: true }).click();
   await page.getByRole('button', { name: 'Enable camera' }).click();
   await expect(page.getByRole('alert')).toContainText('Camera permission was denied');
   await expect(page.getByRole('button', { name: 'Enable camera' })).toBeEnabled();
   await page.getByRole('button', { name: 'Main menu', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Confirm', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Main menu', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your next dance starts here', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Hit checkpoint|keyboard practice/i })).toHaveCount(0);
 });
 
@@ -237,7 +245,7 @@ test('camera rounds show immediate results, survive save failures, and replay wi
   });
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
+  await page.getByRole('button', { name: 'Choose video', exact: true }).click();
   await page.getByRole('button', { name: song.title, exact: true }).click();
   await expect(page.getByRole('button', { name: /Hit checkpoint|keyboard practice/i })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Ready — start / resume' })).toBeDisabled();
@@ -272,23 +280,23 @@ test('camera rounds show immediate results, survive save failures, and replay wi
   expect(errors).toEqual([]);
 });
 
-test('rotary and keyboard menu focus select real songs, skip disabled buttons, and respect exit dialogs', async ({ page, request }) => {
+test('keyboard menu focus select real songs, skip disabled buttons, and respect exit dialogs', async ({ page, request }) => {
   const songs = await (await request.get(`${api}/songs`)).json();
   expect(songs.length).toBeGreaterThanOrEqual(2);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose a song', exact: true }).focus();
+  await page.getByRole('button', { name: 'Choose video', exact: true }).focus();
   await page.keyboard.press('Enter');
-  await page.getByText('Controller connection and testing', { exact: true }).click();
   const first = page.getByRole('button', { name: songs[0].title, exact: true });
   await first.focus(); await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('button', { name: songs[1].title, exact: true })).toBeFocused();
-  await page.getByRole('button', { name: 'Previous item', exact: true }).click();
+  await page.keyboard.press('ArrowUp');
   await expect(first).toBeFocused();
   await first.evaluate((b: HTMLButtonElement) => { b.disabled = true; });
-  await page.getByRole('button', { name: 'Select item', exact: true }).click();
+  await page.keyboard.press('ArrowDown');
+  await expect(first).not.toBeFocused();
   await expect(page.getByRole('region', { name: 'Game', exact: true })).toHaveCount(0);
   await first.evaluate((b: HTMLButtonElement) => { b.disabled = false; });
-  await page.getByRole('button', { name: 'Select item', exact: true }).click();
+  await first.focus(); await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Ready — start / resume' })).toBeDisabled();
   const exit = page.getByRole('button', { name: 'Main menu', exact: true });
   await exit.click();
@@ -298,7 +306,7 @@ test('rotary and keyboard menu focus select real songs, skip disabled buttons, a
   await expect(dialog.getByRole('button', { name: 'Confirm' })).toBeFocused();
   await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(exit).toBeFocused();
   await exit.click(); await dialog.getByRole('button', { name: 'Confirm' }).click();
-  await expect(page.getByRole('heading', { name: 'Main menu', exact: true })).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Your next dance starts here', exact: true })).toBeFocused();
 });
 
 test('camera-only BLE feedback stops on disconnect and reconnect cannot auto-resume', async ({ page, request }) => {
@@ -306,12 +314,14 @@ test('camera-only BLE feedback stops on disconnect and reconnect cannot auto-res
   const songs = await (await request.get(`${api}/songs`)).json();
   const song = songs.find((s: { status: string }) => s.status === 'ready');
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
+  await page.getByRole('button', { name: 'Choose video', exact: true }).click();
   await page.getByRole('button', { name: song.title, exact: true }).click();
+  await page.getByRole('button', { name: 'Developer tools', exact: true }).click();
   await page.getByText('Controller connection and testing', { exact: true }).click();
   await page.getByRole('button', { name: 'Connect simulated ESP32' }).click();
   await page.getByText(/Wearable command monitor/).click();
-  const commands = page.getByRole('list', { name: 'Wearable commands' }).locator('code');
+  const commands = page.locator('ol[aria-label="Wearable commands"] code');
+  await page.getByRole('dialog', { name: 'Developer tools', exact: true }).getByRole('button', { name: 'Back', exact: true }).click();
   const video = page.getByLabel('Reference video');
   // Disconnect at the real playing event so slow CI RPCs cannot miss an eight-second round.
   await page.evaluate(() => {
@@ -320,16 +330,22 @@ test('camera-only BLE feedback stops on disconnect and reconnect cannot auto-res
     }, { once: true });
   });
   await page.getByRole('button', { name: 'Enable camera', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Continue without controller' })).toBeVisible({ timeout: 45000 });
+  // Opening tools deliberately cancels automatic startup; confirm readiness after returning.
+  await expect(page.getByRole('button', { name: 'Ready — start / resume' })).toBeEnabled({ timeout: 40000 });
+  await page.getByRole('button', { name: 'Ready — start / resume' }).click();
+  await expect(page.getByRole('button', { name: 'Continue without controller' })).toBeVisible({ timeout: 15000 });
   expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await page.getByRole('button', { name: 'Developer tools', exact: true }).click();
   await page.getByRole('button', { name: 'Connect simulated ESP32' }).click();
   await expect(commands.last()).toHaveText('RUN:0');
+  await page.getByRole('dialog', { name: 'Developer tools', exact: true }).getByRole('button', { name: 'Back', exact: true }).click();
   expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
   await expect(page.getByRole('button', { name: 'Ready — start / resume' })).toBeEnabled({ timeout: 15000 });
   await page.getByRole('button', { name: 'Ready — start / resume' }).click();
   await expect(commands.filter({ hasText: /^RUN:1$/ })).not.toHaveCount(0, { timeout: 10000 });
   await expect(page.getByRole('region', { name: 'Results', exact: true })).toBeVisible({ timeout: 25000 });
   await expect(commands.last()).toHaveText('RUN:0');
+  await page.getByRole('button', { name: 'Developer tools', exact: true }).click();
   await page.getByText('Movement diagnostics', { exact: true }).click();
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download movement log' }).click();
   const stream = await (await download).createReadStream(); const chunks = []; for await (const chunk of stream!) chunks.push(chunk);
@@ -354,10 +370,12 @@ test('BLE notifications navigate and select, and controller failures keep camera
   });
   const songs = await (await request.get(`${api}/songs`)).json();
   await page.goto('/');
-  await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
+  await page.getByRole('button', { name: 'Choose video', exact: true }).click();
+  await page.getByRole('button', { name: 'Developer tools', exact: true }).click();
   await page.getByText('Controller connection and testing', { exact: true }).click();
   await page.getByRole('button', { name: 'Connect ESP32', exact: true }).click();
   await expect(page.getByText('Controller: connected', { exact: true })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Developer tools', exact: true }).getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByRole('button', { name: songs[0].title, exact: true }).focus();
   await page.evaluate(() => {
     const controls = window as unknown as { testBleNotify: (text: string) => void };
@@ -368,10 +386,54 @@ test('BLE notifications navigate and select, and controller failures keep camera
   await expect(page.getByRole('button', { name: 'Continue without controller' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue without controller' }).click();
   await expect(page.getByRole('button', { name: 'Ready — start / resume' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Developer tools', exact: true }).click();
+  await page.getByText('Controller connection and testing', { exact: true }).click();
   await page.evaluate(() => (window as unknown as { testBleFailWrite: () => void }).testBleFailWrite());
   await page.getByRole('button', { name: 'Connect ESP32', exact: true }).click();
   await expect(page.getByText('Injected BLE write failure', { exact: true })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Developer tools', exact: true }).getByRole('button', { name: 'Back', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Continue without controller' })).toBeVisible();
   expect(await page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await expect(page.getByLabel('Score', { exact: true })).toContainText('Score: 0 ·');
+});
+
+test('settings preserve media, volume and character; developer view traps focus and never resumes a round', async ({ page, request }) => {
+  const songs = await (await request.get(`${api}/songs`)).json();
+  const song = songs.find((s: { status: string }) => s.status === 'ready');
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Choose video', exact: true }).click();
+  await page.getByRole('button', { name: song.title, exact: true }).click();
+  const video = page.getByLabel('Reference video');
+  await expect(video).toBeVisible();
+  const original = await video.elementHandle();
+  const settings = page.getByRole('button', { name: 'Settings', exact: true });
+  await settings.click();
+  const dialog = page.getByRole('dialog', { name: 'Settings', exact: true });
+  await page.getByLabel('Music volume').fill('0.35');
+  await page.getByLabel('Target character').selectOption('human');
+  expect(await video.evaluate((v: HTMLVideoElement) => v.volume)).toBeCloseTo(0.35);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: 'test-results/settings-connected.png' });
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(settings).toBeFocused();
+  expect(await original!.evaluate(n => n === document.querySelector('[aria-label="Reference video"]'))).toBe(true);
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await settings.click();
+  await expect(page.getByLabel('Music volume')).toHaveValue('0.35');
+  await expect(page.getByLabel('Target character')).toHaveValue('human');
+  await page.getByRole('dialog', { name: 'Settings', exact: true }).getByRole('button', { name: 'Back', exact: true }).click();
+  await page.getByRole('button', { name: 'Developer tools', exact: true }).click();
+  await page.keyboard.press('ArrowDown');
+  expect(await page.evaluate(() => !!document.activeElement?.closest('dialog[open]'))).toBe(true);
+  await page.getByText('Movement diagnostics', { exact: true }).click();
+  await page.getByText('Controller connection and testing', { exact: true }).click();
+  await page.screenshot({ path: 'test-results/developer-connected.png' });
+  await page.getByText('Simulate wearable controls', { exact: true }).click();
+  await page.getByRole('button', { name: 'Wearable play / pause', exact: true }).click();
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await expect(page.getByLabel('Replay countdown')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Developer tools', exact: true })).toBeFocused();
   await expect(page.getByLabel('Score', { exact: true })).toContainText('Score: 0 ·');
 });

@@ -1,17 +1,22 @@
 import type { Character } from '../pictograms/rig';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { Bundle } from '../core/types';
 import { useGame } from '../hooks/useGame';
 import type { ResultOutbox } from '../core/outbox';
 import { PoseTarget } from './PoseTarget';
 import { TimingOverlay } from './TimingOverlay';
 import type { WearableClient } from '../core/WearableClient';
-import { CameraPanel } from './CameraPanel';
+import { CameraPanel, CameraSettings } from './CameraPanel';
+import { ToolsDialog } from './ToolsDialog';
+import { WearablePanel } from './WearablePanel';
 import { ConfirmDialog } from './ConfirmDialog';
 
 export function GamePanel({ bundle, wearable, outbox, onResult, onChooseSong, onMainMenu }: { bundle: Bundle; wearable: WearableClient; outbox: ResultOutbox; onResult: () => void; onChooseSong: () => void; onMainMenu: () => void; }) {
   const [confirmation, setConfirmation] = useState<'restart' | 'library' | 'main' | null>(null);
-  const game = useGame(bundle, wearable, confirmation !== null);
+  const [tools, setTools] = useState<'settings' | 'developer' | null>(null);
+  const wearableState = useSyncExternalStore(wearable.subscribeState, wearable.snapshot);
+  const game = useGame(bundle, wearable, confirmation !== null || tools !== null);
+  const openTools = (screen: 'settings' | 'developer') => { game.pause(); setTools(screen); };
   const s = game.snapshot;
   const [showTiming, setShowTiming] = useState(true);
   const [volume, setVolume] = useState(1);
@@ -67,17 +72,34 @@ export function GamePanel({ bundle, wearable, outbox, onResult, onChooseSong, on
           <video ref={game.videoRef} src={bundle.videoUrl} playsInline preload="metadata" width="640" style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', objectFit: 'contain' }} aria-label="Reference video" />
           {showTiming && <TimingOverlay chart={bundle.chart} snapshot={s} showTargetSkeleton={showTargetSkeleton} character={character} />}
         </div>
-        <label><input type="checkbox" checked={showTiming} onChange={e => setShowTiming(e.target.checked)} /> Show timing overlay</label>
+
         <p><button data-controller disabled={!s.playing && game.countdown === null && !game.ready} onClick={() => void game.toggle()}>{game.countdown !== null ? 'Cancel countdown' : s.playing ? 'Pause round' : 'Ready — start / resume'}</button>{' '}<button data-controller disabled={game.countdown !== null} onClick={() => confirm('restart')}>Replay round</button></p>
         {game.error && <p role="alert">{game.error}</p>}
         <p>Diamonds mark detected music beats. Pose bars mark scoring windows. Use this view to check the chart against the music; it does not prove beat detection is correct. Native video fullscreen hides the overlay.</p>
       </section>
       <CameraPanel camera={game.camera} target={bundle.chart.moves.find(m => m.id === (s.activeId ?? s.upcomingIds[0]))} active={s.activeId !== null} showTargetSkeleton={showTargetSkeleton} character={character} />
     </div>
-    <label className="volume-control">Music volume <input type="range" min="0" max="1" step="0.05" value={volume} onChange={event => { const value = Number(event.target.value); setVolume(value); if (game.videoRef.current) game.videoRef.current.volume = value; }} /></label>
+
     {s.seeked && <p>This is a practice segment. Replay from the beginning to record a complete result.</p>}
     </div>
-    <details><summary>Movement diagnostics</summary>
+    <div hidden={s.ended}><p><button data-controller onClick={() => confirm('library')}>Choose another song</button>{' '}<button data-controller onClick={() => confirm('main')}>Main menu</button></p></div>
+
+    <div className="action-row game-tools-actions"><button data-controller onClick={() => openTools('settings')}>Settings</button><button data-controller onClick={() => openTools('developer')}>Developer tools</button></div>
+    {tools === 'settings' && <ToolsDialog title="Settings" subtitle="Set up your camera, music, and dance character." onClose={() => setTools(null)}>
+      <div className="settings-grid"><CameraSettings camera={game.camera} /><section aria-label="Music and character settings">
+    <label className="volume-control">Music volume <input type="range" min="0" max="1" step="0.05" value={volume} onChange={event => { const value = Number(event.target.value); setVolume(value); if (game.videoRef.current) game.videoRef.current.volume = value; }} /></label>
+    <label>Target character <select value={character} onChange={e => setCharacter(e.target.value as Character)}><option value="lenny">Lenny</option><option value="human">Human</option></select></label>{' '}
+    <label><input type="checkbox" checked={showTargetSkeleton} onChange={e => setShowTargetSkeleton(e.target.checked)} /> Show target skeleton instead of artwork</label>
+
+      </section></div>
+      <div className="action-row centered"><button data-controller disabled={!wearable.supported || wearableState.status !== 'disconnected'} onClick={() => void wearable.connect()}>Connect wearable</button></div>
+      <p role="status">Wearable · {wearableState.status}{wearableState.simulated ? ' (simulated)' : ''}</p>
+      {!wearable.supported && <p className="help">Bluetooth requires desktop Chrome or Edge on localhost or HTTPS. The controller is optional.</p>}
+      {wearableState.error && <p role="alert">{wearableState.error}</p>}
+      <p className="help">The round stays paused when you return. Confirm Ready to resume.</p>
+    </ToolsDialog>}
+    <ToolsDialog open={tools === 'developer'} title="Developer tools" subtitle="Testing controls kept separate from the player experience." onClose={() => setTools(null)}>
+      <div className="developer-grid"><section>    <details><summary>Movement diagnostics</summary>
       <p>Camera scoring matches static checkpoints, not continuous choreography. All 12 body joints must be visible in both poses; missing limbs produce LOST rather than an inflated match. Thresholds remain provisional.</p>
       <label><input type="checkbox" checked={game.movementLog?.enabled ?? true} onChange={e => game.setRecording(e.target.checked)} /> Record body movements locally</label>{' '}
       <button onClick={game.downloadLog}>Download movement log</button>{' '}<button onClick={game.clearLog}>Clear movement log</button>
@@ -87,17 +109,16 @@ export function GamePanel({ bundle, wearable, outbox, onResult, onChooseSong, on
       <table><caption>Checkpoint scoring evidence</caption><thead><tr><th>Checkpoint</th><th>Judgment</th><th>Similarity</th><th>Best sample (seconds)</th></tr></thead>
         <tbody>{s.results.map(r => <tr key={r.id}><td>{r.id}</td><td>{r.judgment}</td><td>{r.similarity?.toFixed(4) ?? '—'}</td><td>{r.bestSampleTime?.toFixed(3) ?? '—'}</td></tr>)}</tbody></table>
     </details>
-    <div hidden={s.ended}><p><button data-controller onClick={() => confirm('library')}>Choose another song</button>{' '}<button data-controller onClick={() => confirm('main')}>Main menu</button></p><details><summary>Simulate wearable controls</summary>
+</section><section><WearablePanel wearable={wearable} /><details><summary>Simulate wearable controls</summary>
       <button onClick={() => game.wearable.simulate({ type: 'togglePlayback' })}>Wearable play / pause</button>{' '}
       <button onClick={() => game.wearable.simulate({ type: 'navigate', direction: 'down' })}>Wearable next item</button>
       <p>Wearable events control navigation and playback only. They never score a checkpoint.</p>
     </details>
-    <label>Target character <select value={character} onChange={e => setCharacter(e.target.value as Character)}><option value="lenny">Lenny</option><option value="human">Human</option></select></label>{' '}
-    <label><input type="checkbox" checked={showTargetSkeleton} onChange={e => setShowTargetSkeleton(e.target.checked)} /> Show target skeleton instead of artwork</label>
-    <section aria-label="Upcoming checkpoints"><h3>Upcoming checkpoints</h3>
+</section></div>
+      <details><summary>Chart diagnostics</summary>        <label><input type="checkbox" checked={showTiming} onChange={e => setShowTiming(e.target.checked)} /> Show timing overlay</label>    <section aria-label="Upcoming checkpoints"><h3>Upcoming checkpoints</h3>
       {s.upcomingIds.map(id => <PoseTarget key={id} move={bundle.chart.moves.find(m => m.id === id)!} showSkeleton={showTargetSkeleton} character={character} />)}
-    </section></div>
-
+    </section></details>
+    </ToolsDialog>
     {confirmation && <ConfirmDialog title={confirmation === 'restart' ? 'Restart this dance?' : confirmation === 'library' ? 'Choose another song?' : 'Return to main menu?'} onCancel={() => setConfirmation(null)} onConfirm={() => { const action = confirmation; setConfirmation(null); if (action === 'restart') replay(); else if (action === 'library') onChooseSong(); else onMainMenu(); }} />}
   </section>;
 }
