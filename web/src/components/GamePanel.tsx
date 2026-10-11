@@ -44,7 +44,7 @@ export function GamePanel({ bundle, mode, wearable, outbox, onResult, onChooseSo
     </section>}
     <div hidden={s.ended}>
     {game.controllerWarning && <p role="alert">{game.controllerWarning} <button data-controller onClick={game.useKeyboardControls}>Use keyboard controls</button></p>}
-    {mode === 'camera' && !s.playing && game.countdown === null && <p role="status">{game.ready ? 'Framing ready. Confirm Ready to start or resume.' : 'Stand alone and keep shoulders, wrists, hips, knees and ankles in view for one second.'}</p>}
+    {mode === 'camera' && !s.playing && game.countdown === null && <p role="status">{game.waitingForBody ? 'Stand alone with your whole body in frame. After one second of stable tracking, the countdown and video start automatically.' : game.ready ? 'Framing ready. Confirm Ready to start or resume.' : 'Stand alone and keep shoulders, wrists, hips, knees and ankles in view for one second.'}</p>}
     <p>{mode === 'camera' ? 'Camera scoring' : 'Keyboard practice — separate from camera scores'}</p>
     {bundle.report.cache.source_kind === 'manual' && <p>This bundle was supplied manually with a validated report; its media provenance was not verified by the preparation worker.</p>}
     <div aria-label="Practice video feeds" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 28rem), 1fr))', gap: '1rem', alignItems: 'start', maxWidth: mode === 'camera' ? 1280 : 640 }}>

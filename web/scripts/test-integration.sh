@@ -51,6 +51,7 @@ done
 # A short excerpt of the tracked reference fixture, with its actual music.
 ffmpeg -nostdin -y -loglevel error -i pipeline/testdata/Video_1.mp4 -i pipeline/testdata/audio_1.m4a \
   -t 8 -map 0:v:0 -map 1:a:0 -vf scale=320:180 -c:v libx264 -pix_fmt yuv420p -c:a aac "$RUN_DIR/seed.mp4"
+export DANCIFY_TEST_UPLOAD_VIDEO="$RUN_DIR/seed.mp4"
 pipeline/.venv/bin/python backend/scripts/prepare_smoke.py --base-url "$DANCIFY_TEST_API" --video "$RUN_DIR/seed.mp4" --keep-song
 # Navigation needs two distinct library entries; prepare both through the real pipeline.
 cp "$RUN_DIR/seed.mp4" "$RUN_DIR/second-song.mp4"

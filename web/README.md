@@ -276,8 +276,14 @@ is mean normalized joint displacement, not a calibrated activity or accuracy met
 
 ### Before hardware/design: readiness and controller input
 
-Camera mode requires the whole body in frame for at least one second before the
-**Ready — start / resume** action becomes available. It then runs the countdown.
+For the controller-free demo, camera mode automatically starts the 3–2–1
+countdown once the whole body has been tracked for one second. Enable the camera
+and grant browser permission first. Tracking must remain ready during countdown;
+lost framing cancels it and stable framing restarts it from three. Play again
+also waits for readiness before counting down. Manual pause/cancel, camera failure,
+backgrounding and controller disconnection disable automatic starting until an
+explicit Ready/resume or replay action. Results never automatically replay.
+If the browser blocks playback, use the on-screen Ready button to retry.
 This is framing readiness only: stand alone. The current model cannot count
 people, bind the wearer to a body, or recognize a face. More than 0.75 seconds of
 incomplete framing while playing pauses the round; regain framing and explicitly

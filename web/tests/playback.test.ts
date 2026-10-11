@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PlaybackController } from '../src/core/playback';
 import { GameSession } from '../src/core/session';
 import { chart, target } from './fixtures';
+import { BodyReadiness } from '../src/core/readiness';
 
 class Video extends EventTarget {
   currentTime = 0; duration = 4; readyState = 2; paused = true; seeking = false;
@@ -66,4 +67,56 @@ it('requires readiness on camera start and cancels countdown when readiness is l
   expect(controller.countdown).toBeNull(); expect(video.play).not.toHaveBeenCalled();
   ready = true; await controller.toggle(); await vi.advanceTimersByTimeAsync(3000);
   expect(video.paused).toBe(false); controller.dispose();
+});
+
+function automaticSetup() {
+  const video = new Video(); const session = new GameSession(chart(), 'camera');
+  const readiness = new BodyReadiness(); const error = vi.fn();
+  const controller = new PlaybackController(video as unknown as HTMLVideoElement, session, vi.fn(), error, () => readiness.isReady(Date.now()), true);
+  const observe = (fullBody = true) => { readiness.update(fullBody, Date.now()); controller.observeReadiness(); };
+  return { video, session, controller, readiness, error, observe };
+}
+it('automatically counts down after stable full-body tracking, without repeated starts', async () => {
+  const { video, controller, observe } = automaticSetup();
+  observe(); await vi.advanceTimersByTimeAsync(500); observe(); expect(controller.countdown).toBeNull();
+  await vi.advanceTimersByTimeAsync(500); observe(); expect(controller.countdown).toBe(3);
+  for (const count of [2, 1]) { await vi.advanceTimersByTimeAsync(1000); observe(); expect(controller.countdown).toBe(count); }
+  expect(video.play).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1000); observe();
+  expect(video.play).toHaveBeenCalledTimes(1); expect(video.paused).toBe(false);
+  observe(); expect(controller.countdown).toBeNull(); controller.dispose();
+});
+it('restarts the entire automatic countdown after lost framing becomes stable again', async () => {
+  const { video, controller, observe } = automaticSetup();
+  observe(); await vi.advanceTimersByTimeAsync(1000); observe();
+  await vi.advanceTimersByTimeAsync(1000); observe(false);
+  expect(controller.countdown).toBeNull(); expect(controller.waitingForBody).toBe(true);
+  await vi.advanceTimersByTimeAsync(4000); expect(video.play).not.toHaveBeenCalled();
+  observe(); await vi.advanceTimersByTimeAsync(1000); observe();
+  expect(controller.countdown).toBe(3); controller.dispose();
+});
+it('manual cancellation, safety cancellation and completed rounds do not auto-restart', async () => {
+  for (const action of ['manual', 'safety', 'ended']) {
+    const { video, session, controller, observe } = automaticSetup();
+    if (action === 'manual') { observe(); await vi.advanceTimersByTimeAsync(1000); observe(); await controller.toggle(); }
+    if (action === 'safety') controller.cancelCountdown();
+    if (action === 'ended') session.finish();
+    for (let i = 0; i < 5; i++) { observe(); await vi.advanceTimersByTimeAsync(1000); }
+    expect(video.play).not.toHaveBeenCalled(); expect(controller.countdown).toBeNull(); controller.dispose();
+  }
+});
+it('camera replay waits for readiness and blocked autoplay does not retry in a loop', async () => {
+  const { video, controller, observe, error } = automaticSetup();
+  controller.cancelCountdown(); await controller.replay();
+  expect(controller.waitingForBody).toBe(true); expect(error).not.toHaveBeenCalled();
+  video.play.mockRejectedValue(new Error('Playback blocked'));
+  for (let i = 0; i < 8; i++) { observe(); await vi.advanceTimersByTimeAsync(1000); }
+  expect(video.play).toHaveBeenCalledTimes(1); expect(error).toHaveBeenCalledWith('Playback blocked');
+  expect(controller.waitingForBody).toBe(false); controller.dispose();
+});
+it('keyboard practice never auto-starts from readiness observations', async () => {
+  const video = new Video(); const session = new GameSession(chart(), 'keyboard_practice');
+  const controller = new PlaybackController(video as unknown as HTMLVideoElement, session, vi.fn(), vi.fn());
+  controller.observeReadiness(); await vi.advanceTimersByTimeAsync(5000);
+  expect(video.play).not.toHaveBeenCalled(); controller.dispose();
 });

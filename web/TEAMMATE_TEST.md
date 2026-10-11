@@ -13,8 +13,10 @@ delivered to the test machine; do not assume the remote branch includes them.
 
 | Test | Actions | Expected result |
 | --- | --- | --- |
-| First camera round | Choose camera scoring, enable camera, allow permission, start too close, then step back | Framing feedback updates; Ready becomes available only after sustained full-body visibility |
-| Start | Select Ready | Video and score stay paused during 3–2–1; playback then starts |
+| First camera round | Choose camera scoring, enable camera, allow permission, start too close, then step back | One second of stable full-body visibility automatically starts 3–2–1, without Ready/controller input |
+| Start | Stay fully in frame during countdown | Video and score stay paused during 3–2–1; playback then starts automatically |
+| Countdown framing loss | Step out during countdown, then return | Countdown cancels; stable full-body tracking restarts from three |
+| Deliberate pause | Pause round or cancel countdown and stay in view | Remains paused; use Ready to resume |
 | End and replay | Complete a round, select Play again | Final score appears automatically without Save; replay resets score/log and counts down before starting |
 | Song navigation | Choose another song, then return to Main menu | Correct view appears; old camera stream stops and old score does not carry forward |
 | Framing loss | Move out of frame while playing, then return | Playback pauses after the framing-loss grace period; return alone does not auto-resume; Ready/countdown resumes |

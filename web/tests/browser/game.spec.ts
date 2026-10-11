@@ -107,7 +107,30 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   await page.goto('/');
   await page.getByRole('button', { name: song.title, exact: true }).click();
   await page.getByLabel('Game mode').selectOption('camera');
+  // Capture countdown state inside the page: separate browser round trips can
+  // cross a countdown boundary while real inference is occupying the renderer.
+  await page.evaluate(() => {
+    const observations: { text: string; paused: boolean }[] = [];
+    const observer = new MutationObserver(() => {
+      const text = document.querySelector('[aria-label="Replay countdown"]')?.textContent;
+      if (text && observations.at(-1)?.text !== text) observations.push({ text, paused: document.querySelector<HTMLVideoElement>('[aria-label="Reference video"]')!.paused });
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    Object.assign(window, { countdownObservations: observations, stopCountdownObserver: () => observer.disconnect() });
+  });
   await page.getByRole('button', { name: 'Enable camera' }).click();
+  const automaticCountdown = page.getByRole('status', { name: 'Replay countdown' });
+  await expect(page.getByRole('button', { name: 'Pause round', exact: true })).toBeVisible({ timeout: 45000 });
+  await page.getByRole('button', { name: 'Pause round', exact: true }).click();
+  const countdownObservations = await page.evaluate(() => {
+    const state = window as unknown as { countdownObservations: { text: string; paused: boolean }[]; stopCountdownObserver: () => void };
+    state.stopCountdownObserver(); return state.countdownObservations;
+  });
+  expect(countdownObservations.map(o => o.text)).toEqual(expect.arrayContaining(['Get ready — 3', 'Get ready — 2', 'Get ready — 1']));
+  expect(countdownObservations.every(o => o.paused)).toBe(true);
+  await page.waitForTimeout(1500);
+  expect(await page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await expect(automaticCountdown).toHaveCount(0);
   await expect(page.getByLabel('Body tracking status')).toContainText(/Ready|Tracking body/, { timeout: 40000 });
   const skeleton = page.getByRole('img', { name: 'Tracked body skeleton', exact: true });
   await expect.poll(() => skeleton.evaluate((c: HTMLCanvasElement) => c.width), { timeout: 20000 }).toBeGreaterThan(0);
@@ -144,6 +167,9 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   await expect(page.getByRole('checkbox', { name: 'Show body skeleton' })).not.toBeChecked();
   await page.getByRole('checkbox', { name: 'Show body skeleton' }).check();
   const track = await page.getByLabel('Webcam preview').evaluateHandle((v: HTMLVideoElement) => (v.srcObject as MediaStream).getVideoTracks()[0]);
+  // Give the fault-injection phase enough media time after the automatic-start
+  // check. Otherwise an eight-second fixture can end before the watchdog fires.
+  await page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => { v.currentTime = 0; v.playbackRate = 0.5; });
   const ready = page.getByRole('button', { name: 'Ready — start / resume', exact: true });
   await expect(ready).toBeEnabled({ timeout: 40000 });
   await ready.click();
@@ -178,8 +204,8 @@ test('browser upload runs real preparation and loads the resulting immutable vid
   test.setTimeout(150000);
   const title = `Browser upload ${Date.now()}`;
   // Canonical seed mux has intended music; normalize only its first eight seconds.
-  const source = path.resolve('../pipeline/outputs/web-seed/jd_video_1/reference.mp4');
-  expect(existsSync(source), 'Run the seed command with --work-dir pipeline/outputs/web-seed').toBeTruthy();
+  const source = process.env.DANCIFY_TEST_UPLOAD_VIDEO || path.resolve('../pipeline/outputs/web-seed/jd_video_1/reference.mp4');
+  expect(existsSync(source), 'Run scripts/test-integration.sh or seed with --work-dir pipeline/outputs/web-seed').toBeTruthy();
   await page.goto('/');
   await page.getByLabel('Song title').fill(title);
   await page.getByLabel('Source', { exact: true }).selectOption('upload');

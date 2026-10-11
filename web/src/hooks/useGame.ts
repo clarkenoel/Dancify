@@ -55,6 +55,7 @@ export function useGame(bundle: Bundle, mode: Mode, wearable: WearableClient) {
     const now = performance.now();
     const fullBody = cameraFeedback(sample.raw, sample.pose !== null).fullBody && sample.pose !== null;
     readiness.current.update(fullBody, now);
+    if (!document.hidden) controller.current?.observeReadiness();
     if (fullBody) lossSince.current = null;
     else {
       lossSince.current ??= now;
@@ -74,6 +75,7 @@ export function useGame(bundle: Bundle, mode: Mode, wearable: WearableClient) {
   const camera = useCamera(mode === 'camera', capture, sample, stopForCameraChange);
   return {
     ready: mode !== 'camera' || readiness.current.isReady(performance.now()),
+    waitingForBody: controller.current?.waitingForBody ?? mode === 'camera',
     controllerWarning,
     useKeyboardControls: () => { controllerBlocked.current = false; setControllerWarning(''); refresh(); },
     videoRef, snapshot, error, camera, wearable, countdown: controller.current?.countdown ?? null,
