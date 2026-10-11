@@ -27,6 +27,8 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   await page.getByRole('button', { name: 'Choose video', exact: true }).click();
   await page.getByRole('button', { name: song.title, exact: true }).click();
   await expect(page.getByLabel('Reference video')).toBeVisible();
+  await expect(page.getByLabel('Timing overlay', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Show timing overlay', { exact: true })).toHaveCount(0);
   // Capture countdown state inside the page: separate browser round trips can
   // cross a countdown boundary while real inference is occupying the renderer.
   await page.evaluate(() => {
@@ -264,10 +266,27 @@ test('camera rounds show immediate results, survive save failures, and replay wi
   await expect(results.getByRole('button')).toHaveText(['Play again', 'Choose another song', 'Main menu']);
   await expect(page.getByRole('button', { name: /Save result/ })).toHaveCount(0);
   await page.screenshot({ path: 'test-results/pages-results.png', fullPage: true });
+  await page.evaluate(() => {
+    const observations: { text: string; paused: boolean }[] = [];
+    const observer = new MutationObserver(() => {
+      const text = document.querySelector('[aria-label="Replay countdown"]')?.textContent;
+      if (text && observations.at(-1)?.text !== text) observations.push({ text,
+        paused: document.querySelector<HTMLVideoElement>('[aria-label="Reference video"]')!.paused });
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    Object.assign(window, { replayCountdownObservations: observations, stopReplayCountdownObserver: () => observer.disconnect() });
+  });
   await results.getByRole('button', { name: 'Play again' }).click();
-  const countdown = page.getByRole('status', { name: 'Replay countdown' });
-  await expect(countdown).toHaveText('Get ready — 3', { timeout: 15000 });
-  expect(await page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  // Read countdown and paused together in its actual render turn. Separate RPCs
+  // can cross the three-second boundary while software inference is busy.
+  await expect.poll(() => page.evaluate(() =>
+    (window as unknown as { replayCountdownObservations: { text: string }[] }).replayCountdownObservations.map(o => o.text)),
+  { timeout: 15000 }).toEqual(expect.arrayContaining(['Get ready — 3', 'Get ready — 2', 'Get ready — 1']));
+  const countdownObservations = await page.evaluate(() => {
+    const state = window as unknown as { replayCountdownObservations: { paused: boolean }[]; stopReplayCountdownObserver: () => void };
+    state.stopReplayCountdownObserver(); return state.replayCountdownObservations;
+  });
+  expect(countdownObservations.every(observation => observation.paused)).toBe(true);
   await expect(results).toBeVisible({ timeout: 35000 });
   await expect.poll(() => saved.length).toBe(2);
   expect(saved[0].client_session_id).not.toBe(saved[1].client_session_id);
@@ -309,8 +328,10 @@ test('keyboard menu focus select real songs, skip disabled buttons, and respect 
   await expect(page.getByRole('heading', { name: 'Your next dance starts here', exact: true })).toBeFocused();
 });
 
-test('camera-only BLE feedback stops on disconnect and reconnect cannot auto-resume', async ({ page, request }) => {
-  test.setTimeout(90000);
+test('camera-only BLE stays quiet, disconnect pauses, and a completed rating cues only once', async ({ page, request }) => {
+  // Real model startup, two countdowns and the full round have independent
+  // assertion limits. Let all of them finish on software-rendered CI workers.
+  test.setTimeout(150000);
   const songs = await (await request.get(`${api}/songs`)).json();
   const song = songs.find((s: { status: string }) => s.status === 'ready');
   await page.goto('/');
@@ -325,9 +346,23 @@ test('camera-only BLE feedback stops on disconnect and reconnect cannot auto-res
   const video = page.getByLabel('Reference video');
   // Disconnect at the real playing event so slow CI RPCs cannot miss an eight-second round.
   await page.evaluate(() => {
-    document.querySelector<HTMLVideoElement>('[aria-label="Reference video"]')!.addEventListener('playing', () => {
+    const reference = document.querySelector<HTMLVideoElement>('[aria-label="Reference video"]')!;
+    reference.addEventListener('playing', () => {
       [...document.querySelectorAll('button')].find(b => b.textContent === 'Disconnect ESP32')!.click();
     }, { once: true });
+    const cues: { ended: boolean; paused: boolean }[] = [];
+    const seen = new WeakSet<Element>();
+    const monitor = document.querySelector('ol[aria-label="Wearable commands"]')!;
+    const observer = new MutationObserver(() => {
+      for (const code of monitor.querySelectorAll('code')) {
+        if (code.textContent === 'TONE:880' && !seen.has(code)) {
+          seen.add(code);
+          if ((window as unknown as { resumedAfterReconnect?: boolean }).resumedAfterReconnect) cues.push({ ended: reference.ended, paused: reference.paused });
+        }
+      }
+    });
+    observer.observe(monitor, { childList: true, subtree: true, characterData: true });
+    Object.assign(window, { ratingCueObservations: cues, stopRatingCueObserver: () => observer.disconnect() });
   });
   await page.getByRole('button', { name: 'Enable camera', exact: true }).click();
   // Opening tools deliberately cancels automatic startup; confirm readiness after returning.
@@ -340,19 +375,47 @@ test('camera-only BLE feedback stops on disconnect and reconnect cannot auto-res
   await expect(commands.last()).toHaveText('RUN:0');
   await page.getByRole('dialog', { name: 'Developer tools', exact: true }).getByRole('button', { name: 'Back', exact: true }).click();
   expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await page.evaluate(() => {
+    Object.assign(window, { resumedAfterReconnect: false });
+    const reference = document.querySelector<HTMLVideoElement>('[aria-label="Reference video"]')!;
+    reference.addEventListener('playing', () => {
+      const tones = [...document.querySelectorAll('ol[aria-label="Wearable commands"] code')].filter(code => code.textContent === 'TONE:880').length;
+      Object.assign(window, { resumedAfterReconnect: !reference.paused, tonesBeforeRound: tones });
+    }, { once: true });
+  });
   await expect(page.getByRole('button', { name: 'Ready — start / resume' })).toBeEnabled({ timeout: 15000 });
   await page.getByRole('button', { name: 'Ready — start / resume' }).click();
-  await expect(commands.filter({ hasText: /^RUN:1$/ })).not.toHaveCount(0, { timeout: 10000 });
+  await expect.poll(() => page.evaluate(() => (window as unknown as { resumedAfterReconnect: boolean }).resumedAfterReconnect), { timeout: 10000 }).toBe(true);
   await expect(page.getByRole('region', { name: 'Results', exact: true })).toBeVisible({ timeout: 25000 });
-  await expect(commands.last()).toHaveText('RUN:0');
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  const tonesBeforeRound = await page.evaluate(() => (window as unknown as { tonesBeforeRound: number }).tonesBeforeRound);
+  await expect(commands.filter({ hasText: /^TONE:880$/ })).toHaveCount(tonesBeforeRound + 1);
+  expect(await page.evaluate(() => {
+    const state = window as unknown as { ratingCueObservations: { ended: boolean; paused: boolean }[]; stopRatingCueObserver: () => void };
+    state.stopRatingCueObserver(); return state.ratingCueObservations;
+  })).toEqual([{ ended: true, paused: true }]);
   await page.getByRole('button', { name: 'Developer tools', exact: true }).click();
   await page.getByText('Movement diagnostics', { exact: true }).click();
   const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download movement log' }).click();
   const stream = await (await download).createReadStream(); const chunks = []; for await (const chunk of stream!) chunks.push(chunk);
   const log = JSON.parse(Buffer.concat(chunks).toString());
   expect(log.samples.length).toBeGreaterThan(0); expect(log.mode).toBe('camera');
-  const earned = log.snapshot.results.filter((r: { judgment: string }) => ['GOOD', 'SUPER', 'PERFECT'].includes(r.judgment));
-  expect(await commands.filter({ hasText: /^HIT:1$/ }).count()).toBe(earned.length);
+  expect(log.snapshot.ended).toBe(true); expect(log.snapshot.seeked).toBe(false);
+  // This real recorded dancer must earn the approved first-star threshold.
+  // There is no fabricated score or threshold override in this test.
+  expect(log.snapshot.accuracy).toBeGreaterThanOrEqual(0.20);
+  const output = await commands.allTextContents();
+  const tonesAfterTools = output.filter(command => command === 'TONE:880').length;
+  expect(output).toContain('RUN:0');
+  expect(output.filter(command => /^(RUN:1|BPM:|BEAT:|SYNC:|HIT:)/.test(command))).toEqual([]);
+  await page.waitForTimeout(1500);
+  expect(await commands.allTextContents()).toEqual(output);
+  await page.getByRole('button', { name: 'Disconnect ESP32', exact: true }).click();
+  await page.getByRole('button', { name: 'Connect simulated ESP32' }).click();
+  await expect(commands.last()).toHaveText('RUN:0');
+  await page.waitForTimeout(1500);
+  await expect(commands.filter({ hasText: /^TONE:880$/ })).toHaveCount(tonesAfterTools);
+  expect(await video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
 });
 
 test('BLE notifications navigate and select, and controller failures keep camera readiness blocked until explicit recovery', async ({ page, request }) => {
@@ -436,4 +499,56 @@ test('settings preserve media, volume and character; developer view traps focus 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Developer tools', exact: true })).toBeFocused();
   await expect(page.getByLabel('Score', { exact: true })).toContainText('Score: 0 ·');
+});
+
+test('real audio assets decode after a gesture and menu actions play once across navigation', async ({ page, request }) => {
+  await page.addInitScript(() => {
+    const probe = { decoded: [] as number[], voices: [] as { duration: number; state: string; startedAt: number; stoppedAfterMs: number | null }[] };
+    const voices = new WeakMap<AudioBufferSourceNode, number>();
+    const decode = BaseAudioContext.prototype.decodeAudioData;
+    BaseAudioContext.prototype.decodeAudioData = function(data, success, failure) {
+      return decode.call(this, data, success, failure).then(buffer => { probe.decoded.push(buffer.duration); return buffer; });
+    };
+    const start = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function(...args) {
+      voices.set(this, probe.voices.length);
+      probe.voices.push({ duration: this.buffer?.duration ?? 0, state: this.context.state, startedAt: performance.now(), stoppedAfterMs: null });
+      return start.apply(this, args);
+    };
+    const stop = AudioBufferSourceNode.prototype.stop;
+    AudioBufferSourceNode.prototype.stop = function(...args) {
+      const index = voices.get(this);
+      if (index !== undefined && probe.voices[index].stoppedAfterMs === null) probe.voices[index].stoppedAfterMs = performance.now() - probe.voices[index].startedAt;
+      return stop.apply(this, args);
+    };
+    Object.assign(window, { audioProbe: probe });
+  });
+  const readAudio = () => page.evaluate(() => (window as unknown as {
+    audioProbe: { decoded: number[]; voices: { duration: number; state: string; stoppedAfterMs: number | null }[] };
+  }).audioProbe);
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  const songs = await (await request.get(`${api}/songs`)).json();
+  await page.goto('/');
+  expect((await readAudio()).voices).toEqual([]);
+  await page.getByRole('button', { name: 'Choose video', exact: true }).click();
+  await expect.poll(async () => (await readAudio()).decoded.length).toBe(3);
+  await expect.poll(async () => (await readAudio()).voices.length).toBe(1);
+  await page.waitForTimeout(150);
+  const first = (await readAudio()).voices[0];
+  expect(first.duration).toBeGreaterThan(0.5); expect(first.state).toBe('running');
+  // A screen transition must not immediately cancel its own selection sound.
+  expect(first.stoppedAfterMs === null || first.stoppedAfterMs >= 100).toBe(true);
+  await page.getByRole('button', { name: songs[0].title, exact: true }).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect.poll(async () => (await readAudio()).voices.length).toBe(2);
+  expect((await readAudio()).voices[1].duration).toBeLessThan(0.3);
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('region', { name: 'Game', exact: true })).toBeVisible();
+  await expect.poll(async () => (await readAudio()).voices.length).toBe(3);
+  await page.waitForTimeout(150);
+  const selected = (await readAudio()).voices[2];
+  expect(selected.duration).toBeGreaterThan(0.5);
+  expect(selected.stoppedAfterMs === null || selected.stoppedAfterMs >= 100).toBe(true);
+  expect((await readAudio()).decoded.every(duration => duration > 0)).toBe(true);
+  expect(errors).toEqual([]);
 });

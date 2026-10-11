@@ -88,8 +88,9 @@ in memory (last 200); they are not physical piezo or scoring-accuracy measuremen
 
 ## Illustrated targets
 
-- Open a ready song: Lenny should appear in the timing overlay and upcoming targets;
-  Camera scoring uses the same artwork beside the webcam.
+- Open a ready song: the reference video has no Dancify beat/pose timing overlay.
+  The user's webcam still shows the tracked-body skeleton. Lenny appears beside
+  the webcam and in Developer tools' upcoming targets.
 - Switch **Target character** to Human: it should have blue fill/dark outlines.
   Switch back to Lenny: it should have green skin and cream scutes/horns.
 - Pause, note the video time/score, then toggle **Show target skeleton instead of

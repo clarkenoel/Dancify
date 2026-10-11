@@ -8,11 +8,11 @@ class Video extends EventTarget {
   currentTime = 0; paused = true; seeking = false; readyState = 2; playbackRate = 1;
 }
 const flush = async () => { for (let i = 0; i < 50; i++) await Promise.resolve(); };
-async function setup() {
+async function setup(enabled = true) {
   const video = new Video(); const client = new WearableClient(); client.connectSimulator(); await flush(); client.clearOutput();
   const dance = chart(); dance.duration = 20; dance.beat_times = Array.from({ length: 39 }, (_, i) => .5 + i * .5);
   const session = new GameSession(dance); let hidden = false; let now = 0;
-  const feedback = new WearableFeedback(video as unknown as HTMLVideoElement, dance, client, () => hidden, () => now);
+  const feedback = new WearableFeedback(video as unknown as HTMLVideoElement, dance, client, () => hidden, () => now, enabled);
   const update = async () => { feedback.update(session.snapshot()); await flush(); };
   const advance = async (time: number) => { video.currentTime = time; session.tick(time); now += 100; await update(); };
   const start = async () => { video.paused = false; session.play(); await update(); };
@@ -26,6 +26,17 @@ it('is silent before playback, configures against video time, and syncs each fiv
   await f.start(); expect(f.commands()).toEqual(['RUN:0', 'BPM:120', 'BEAT:0.5000', 'RUN:1']);
   for (let time = 1; time <= 5; time++) await f.advance(time);
   expect(f.commands().filter(c => c.startsWith('SYNC:'))).toEqual(['SYNC:0.0000']); f.dispose();
+});
+it('quiet demo policy never starts a metronome or per-hit feedback while retaining real scoring', async () => {
+  const f = await setup(false); await f.start(); await f.advance(1.1);
+  f.session.sample(1.1, f.session.epoch, target()); await f.advance(1.5);
+  for (let time = 2; time <= 8; time++) await f.advance(time);
+  expect(f.session.snapshot().results[0].judgment).toBe('PERFECT');
+  expect(f.session.snapshot().score).toBeGreaterThan(0);
+  expect(f.commands()).toEqual([]);
+  f.video.paused = true; f.video.dispatchEvent(new Event('pause')); f.session.pause(); await f.update();
+  await f.start(); f.session.finish(); await f.update();
+  expect(f.commands()).toEqual([]); f.dispose();
 });
 it('emits one hit for a real comparable camera result; duplicate updates and LOST never hit', async () => {
   const f = await setup(); await f.start(); await f.advance(1.1);
@@ -67,6 +78,18 @@ it('unobserved camera checkpoints are LOST and never send feedback', async () =>
   const f = await setup(); await f.start(); await f.advance(1); await f.advance(1.5);
   expect(f.session.snapshot().results[0].judgment).toBe('LOST');
   expect(f.commands()).not.toContain('HIT:1'); f.dispose();
+});
+it('a comparable result finalized at video end contributes to score without a late hit beep', async () => {
+  const f = await setup(); await f.start(); await f.advance(1.1);
+  f.session.sample(1.1, f.session.epoch, target());
+  expect(f.session.snapshot().results).toHaveLength(0);
+  f.video.paused = true; f.video.dispatchEvent(new Event('ended'));
+  f.session.finish(); await f.update();
+  expect(f.session.snapshot().results[0].judgment).toBe('PERFECT');
+  expect(f.session.snapshot().score).toBeGreaterThan(0);
+  expect(f.commands().at(-1)).toBe('RUN:0');
+  expect(f.commands()).not.toContain('HIT:1');
+  await f.update(); expect(f.commands()).not.toContain('HIT:1'); f.dispose();
 });
 it('restoring normal speed and seeking to a new segment reconfigure without replaying earlier results', async () => {
   const f = await setup(); await f.start();

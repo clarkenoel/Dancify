@@ -2,9 +2,9 @@ name: Web and launcher
 
 on:
   pull_request:
-    paths: ['web/**', 'backend/**', 'pipeline/**', 'schema/**', 'scripts/**', '*.cmd', '.github/workflows/web.yml']
+    paths: ['web/**', 'backend/**', 'pipeline/**', 'firmware/**', 'schema/**', 'scripts/**', '*.cmd', '.github/workflows/web.yml']
   push:
-    paths: ['web/**', 'backend/**', 'pipeline/**', 'schema/**', 'scripts/**', '*.cmd', '.github/workflows/web.yml']
+    paths: ['web/**', 'backend/**', 'pipeline/**', 'firmware/**', 'schema/**', 'scripts/**', '*.cmd', '.github/workflows/web.yml']
   workflow_dispatch:
 
 permissions:
@@ -32,6 +32,12 @@ jobs:
       - run: npm test --prefix web
       - run: npm run build --prefix web
       - run: python3 -m unittest discover -s scripts/tests -v
+      - name: Firmware parser, controls and buzzer host tests
+        run: |
+          c++ -std=c++14 -Wall -Wextra -Werror -pedantic firmware/tests/firmware_tests.cpp -o /tmp/dancify-firmware-tests
+          /tmp/dancify-firmware-tests
+          c++ -std=c++14 -Wall -Wextra -Werror -pedantic firmware/tests/buzzer_bench.cpp -o /tmp/dancify-buzzer-bench
+          /tmp/dancify-buzzer-bench
 
   browser:
     needs: checks

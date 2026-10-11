@@ -100,7 +100,7 @@ Three independent pieces plus one shared contract layer.
 - If torso or too few joints are visible, **return `null`, not 0**. The game loop distinguishes miss vs. lost-tracking.
 - Comparison metric: cosine similarity of joint-angle vectors, weighted toward arms and legs.
 
-**The game must remain fully playable with keyboard only.** In menus, arrow keys move focus through items and Enter activates the focused item, matching rotary navigation and the single button. Gameplay keyboard bindings remain context-specific. This is the demo-day fallback if Bluetooth fails.
+**Camera tracking is required for gameplay.** In menus, arrow keys move focus through items and Enter activates the focused item, matching rotary navigation and the single button. If Bluetooth fails, on-screen/keyboard menu controls remain available, but there is no keyboard scoring or keyboard-only gameplay.
 
 ### 4.2.1 Session player identification (planned)
 
@@ -130,11 +130,11 @@ for lifecycle rules, phases W1–W6, acceptance gates and unresolved model choic
 ### 4.3 The Wearable (ESP32 firmware) — Built in Phase 3
 
 **Hardware:**
-- ESP32 dev board.
-- Rotary angle sensor for rotational menu navigation; replaces the joystick. Exact sensor model, electrical interface, travel range, and wiring remain to be confirmed. If the chosen sensor has an analog output, use an ADC1-capable pin; do not assume a two-axis joystick pinout.
+- Waveshare ESP32-S3 Zero (confirmed in hardware testing).
+- Grove Rotary Angle Sensor, analog and limited-travel, on GPIO 8 (ADC1 on the ESP32-S3), powered from 3.3 V with common ground. Clockwise moves forward; reverse at an endpoint rather than treating it as an endless encoder.
 - One physical button for selecting/confirming the focused item and explicit player pairing.
 - No wearable-controlled mouse pointer or two-axis cursor navigation.
-- Two passive piezo buzzers wired **in parallel** to a single GPIO through a shared 100Ω resistor.
+- Active buzzers using the existing tested driver/power circuit, controlled by GPIO 7; one button to ground on GPIO 10 with internal pull-up. Active buzzers make a fixed pitch from ON/OFF pulses. The older passive-piezo/shared-resistor assumption is superseded; GPIO 7 is a control signal, not a specification for powering two bare buzzers.
 - Velcro strap or sweatband for forearm mounting.
 
 **Firmware behavior:**
@@ -145,10 +145,11 @@ for lifecycle rules, phases W1–W6, acceptance gates and unresolved model choic
 - Two BLE characteristics:
   - **RX** (browser → ESP32, write): `RUN:0`, `BPM:120`, `BEAT:0.5`, `RUN:1`, `HIT:1`, `TONE:880`, `SYNC:0.512`.
   - **TX** (ESP32 → browser, notify): rotary navigation steps and single-button actions. Clockwise sends `DIR:DOWN`; counterclockwise sends `DIR:UP`; see §5.2. Existing `BTN:DOWN|UP|CLICK|HOLD` messages remain the button contract.
-- **Piezo driven via the LEDC peripheral, not `tone()`.** LEDC generates the waveform; firmware still schedules envelopes. BLE latency and envelope timing require physical measurement.
-- **Piezo timing:** browser configures BPM/BEAT and explicitly enables RUN on each playback start/resume. ESP32 schedules envelopes without blocking and uses LEDC for the waveform. SYNC every ~5 reference-video seconds slews phase; pause/end request RUN:0. See §5.2 for fail-safes and timing limitations.
+- **Active buzzer output:** nonblocking ON/OFF envelopes. The optional passive-piezo build uses LEDC, never Arduino `tone()`. Requested TONE pitch is not reproduced by active buzzers; only the short cue envelope is used.
+- **Demo sound policy (2026-10-11):** continuous metronome and per-checkpoint wearable HIT sounds are disabled by default. A completed, unseeked round earning at least one star requests one short `TONE:880` cue while connected and visible. Reconnect never replays an old result. Final accuracy thresholds are 20/35/50/65/85%; no comparable poses has no rating/cue. This changes browser event selection, not BLE message framing.
+- **Optional timing diagnostic:** `VITE_DANCIFY_WEARABLE_METRONOME=true` restores the existing RUN/BPM/BEAT/SYNC/HIT behavior for development. The ESP32 retains disconnect silence and its 15-second SYNC fail-safe. Timing remains unmeasured on physical hardware.
 
-**The wearable does not contribute to scoring.** It is a coach (metronome) and a controller (menu navigation). This is a deliberate design choice.
+**The wearable does not contribute to scoring.** It controls menus and provides short result feedback. Metronome capability remains a diagnostic option.
 
 ### 4.4 The Pictogram System (Paper-Doll Rig)
 
@@ -218,16 +219,17 @@ results and song/mode changes silence metronome feedback; non-unit speed disable
 it. Queued stale output is discarded. A submitted BLE write cannot be recalled.
 
 HIT follows a newly finalized GOOD/SUPER/PERFECT checkpoint while feedback is
-enabled; MISS/LOST and old results never produce catch-up hits. Keyboard practice
-remains labeled separately. There is no exact choreographic hit timestamp in the
+enabled through the optional metronome diagnostic; MISS/LOST and old results never
+produce catch-up hits. There is no exact choreographic hit timestamp in the
 chart. Menu selection requests a short TONE; rotation is silent. The wearable
 never supplies scoring input or identifies its wearer.
 
 Write failure or controller loss pauses gameplay and requires explicit reconnect
-or keyboard fallback. Reconnect never resumes automatically. Firmware must boot
+or explicit Continue without controller (camera scoring remains required). Reconnect never resumes automatically. Firmware must boot
 stopped, stop on disconnect, and stop after 15 seconds without SYNC while running.
-ESP32 firmware is still absent: radio reliability, audible phase, latency and
-drift require physical trials. Integer BPM and one-way phase delivery are
+ESP32-S3 firmware is implemented and target-compiles with Espressif core 3.3.12;
+upload, radio reliability, audible phase, latency and drift still require physical trials.
+Integer BPM and one-way phase delivery are
 approximations, not a demonstrated timing guarantee.
 
 The authorized BLE revision is now re-frozen in the authoritative

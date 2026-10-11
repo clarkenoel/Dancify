@@ -9,12 +9,12 @@ You are working on the ESP32 wearable only. Person C owns this directory.
 
 ## Rules
 
-- Piezo uses LEDC, never `tone()`.
+- Confirmed ESP32-S3 Zero hardware uses active buzzers with nonblocking ON/OFF envelopes on GPIO 7. The optional passive-piezo build uses LEDC, never Arduino `tone()`.
 - Hardware is a rotary angle sensor and one button; no joystick or mouse cursor. Confirm model, interface and travel range before assigning pins.
-- If the sensor has analog output, use ADC1-capable pins (GPIO 32–39), never ADC2.
+- The confirmed Grove limited-travel analog sensor uses GPIO 8, an ADC1 pin on the S3. GPIO 32–39 guidance was for the original ESP32; do not apply that pin map to this board. The button is GPIO 10.
 - Sample the sensor in a scheduled nonblocking task; suppress stationary jitter and handle wraparound or endpoints according to the actual hardware.
 - No scoring contribution. Metronome + controller only.
-- Two piezos in parallel on one GPIO through a shared 100Ω resistor.
+- Preserve the hardware owner's tested active-buzzer power/driver circuit. GPIO 7 is its control signal; do not assume it can power two bare buzzers directly.
 
 ## Session Start
 

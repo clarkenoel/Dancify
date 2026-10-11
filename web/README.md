@@ -190,16 +190,16 @@ MediaPipe inference and camera cleanup, real upload
 preparation, and the provider-failure fallback UI. History-failure and download-failure checks intercept API requests. Unit tests verify pose parity, invalid charts, lost tracking,
 pause/seek epochs, absence of keyboard scoring, bundle pinning, and outbox recovery.
 
-## Temporary timing overlay
+## Video presentation
 
-The game shows a switchable overlay on the reference video. Beat diamonds cross
-NOW at the chart's `beat_times`; pose bars span the actual scoring windows. The
-current/next stick-figure pose, MATCH prompt, score, and combo remain visible
-on the video. Positions derive from the existing video-time snapshot, including
-pause, seek, and replay. This does not invent directional
-notes or exact hit timestamps. Use it to compare detected beats with the music.
-Native video fullscreen displays only the video; keep the player inline to show
-the overlay. Artwork and human timing calibration remain follow-up work.
+The reference dancer's video has no Dancify beat/pose timing overlay or target
+figure layered over it. The start/replay countdown remains. Graphics already
+embedded in an uploaded video are part of that source video.
+
+The user's mirrored webcam retains its tracked-body skeleton. Illustrated target
+poses remain beside the webcam and in Developer tools' upcoming checkpoints.
+Removing the reference overlay does not change beat extraction, tracking, scoring,
+or the reference video's role as the gameplay clock.
 
 ## Planned session player identification
 
@@ -345,9 +345,25 @@ testing with one person in frame.
 
 ### Wearable output testing (no hardware needed)
 
+The demo defaults to quiet wearable output: no metronome or per-hit beeps.
+One short TONE is requested at results for a completed, unseeked round earning
+at least one star (accuracy thresholds 20/35/50/65/85%). No comparable poses has
+no rating/cue. A hidden tab or disconnected device receives no delayed result cue
+on return/reconnect. Menu selection still requests the existing short TONE.
+
+The supplied Scroll 3, ButtonClick and Miss1 assets play through the computer's
+speakers for menu movement, activation and new MISS judgments during active play.
+Audio unlocks on a real pointer/key gesture. LOST tracking is silent; old or
+end-of-round judgments never cause a burst of miss sounds. Reference-video audio
+remains the music source and its currentTime remains the gameplay clock.
+See [asset status](src/assets/audio/README.md) for the four pending audio-only uploads.
+
 Open **Developer tools → Controller connection and testing**, click **Connect simulated ESP32**, then
 expand **Wearable command monitor**. Select a prepared song and enable the camera. The simulator shows the same command queue used by
 Bluetooth; it neither plays sound nor provides score/pose data.
+
+For the optional metronome diagnostic, set `VITE_DANCIFY_WEARABLE_METRONOME=true`
+before starting Vite. Leave it unset for the quiet demo. With that diagnostic enabled:
 
 - Playing at normal speed configures RUN:0 → BPM → BEAT → RUN:1. BEAT and periodic
   SYNC use seconds until the next actual chart beat from reference video time.
@@ -378,7 +394,7 @@ run `python3 -m unittest discover -s scripts/tests -v` and the documented
 
 ### Illustrated target poses
 
-Prepared songs show **Lenny** or **Human** in the timing overlay, camera target and
+Prepared songs show **Lenny** or **Human** in the camera target and
 upcoming checkpoint list. Use **Target character** to switch without restarting. **Show target skeleton instead of artwork** switches all targets
 for comparison without restarting the video/session. Artwork loading/failure and
 unusable projected geometry retain the skeleton display; scores use the original

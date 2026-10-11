@@ -9,6 +9,7 @@ import { WearableClient } from './core/WearableClient';
 import { ToolsDialog } from './components/ToolsDialog';
 import { MainMenu } from './components/MainMenu';
 import { MenuNavigation } from './core/menuNavigation';
+import { useSoundEffects } from './hooks/useSoundEffects';
 
 const api = new DancifyApi();
 const outbox = new ResultOutbox(api, localStorage);
@@ -18,20 +19,26 @@ type Screen = 'main' | 'library' | 'prepare';
 // Figma main 15-237, library 15-358, prepare 15-259/15-281.
 // https://www.figma.com/design/73KXHiJcCoHRsR5XK54kQ7/Dancify-Roller-Rink-Redesign
 export default function App() {
+  const { play: playSound, stopGameplay: stopSounds } = useSoundEffects();
   const [wearable] = useState(() => new WearableClient());
   const menu = useRef(new MenuNavigation());
   const root = useRef<HTMLElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const menuRoot = () => root.current?.querySelector<HTMLElement>('dialog[open]') ?? root.current;
+  const moveMenu = useCallback((scope: HTMLElement, direction: -1 | 1) => {
+    const previous = document.activeElement;
+    menu.current.move(scope, direction);
+    if (document.activeElement !== previous) playSound('menuMove');
+  }, [playSound]);
   useEffect(() => {
     const unsubscribe = wearable.subscribe(event => {
       const scope = menuRoot();
       if (!scope || document.hidden) return;
-      if (event.type === 'navigate') menu.current.move(scope, event.direction === 'up' || event.direction === 'left' ? -1 : 1);
+      if (event.type === 'navigate') moveMenu(scope, event.direction === 'up' || event.direction === 'left' ? -1 : 1);
       if (event.type === 'activate') menu.current.activate(scope);
     });
     return () => { unsubscribe(); wearable.disconnect(); };
-  }, [wearable]);
+  }, [wearable, moveMenu]);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try { return localStorage.getItem('dancify-theme') === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
   });
@@ -83,6 +90,7 @@ export default function App() {
     return () => { mounted.current = false; request.current?.abort(); };
   }, [refresh]);
   useEffect(() => { if (!bundle) heading.current?.focus(); }, [screen, bundle]);
+  useEffect(() => { stopSounds(); }, [bundle, screen, stopSounds]);
   useEffect(() => {
     if (!selected) return;
     const controller = new AbortController(); setHistory([]);
@@ -121,12 +129,14 @@ export default function App() {
   const job = preparation.job;
   const activeJob = job && (job.status === 'queued' || job.status === 'processing');
   return <main ref={root} className="app-shell" onClickCapture={event => {
+    const clicked = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
+    if (clicked && !clicked.disabled) playSound('select');
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-controller]');
     if (button && !button.disabled && !document.hidden) wearable.selectionFeedback();
   }} onKeyDown={event => {
     if (event.ctrlKey || event.altKey || event.metaKey || (event.target as HTMLElement).closest('input, textarea, select, video, [contenteditable="true"]')) return;
     if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-      event.preventDefault(); const scope = menuRoot(); if (scope) menu.current.move(scope, event.key === 'ArrowUp' ? -1 : 1);
+      event.preventDefault(); const scope = menuRoot(); if (scope) moveMenu(scope, event.key === 'ArrowUp' ? -1 : 1);
     }
   }}>
     <header className={`site-header ${!bundle && screen === 'main' ? 'design-header' : ''}`}><span className="wordmark">Dancify</span>
@@ -185,7 +195,7 @@ export default function App() {
           <button data-controller disabled={sending === item.result.client_session_id} onClick={() => { setSending(item.result.client_session_id); void act(async () => { await outbox.send(item); setPending(outbox.list()); }).finally(() => setSending(null)); }}>Retry pending result</button></p>)}
       </section>}
     </div>}
-    {bundle && <GamePanel key={bundle.id} bundle={bundle} wearable={wearable} outbox={outbox} onResult={() => setPending(outbox.list())} onChooseSong={() => navigate('library')} onMainMenu={() => navigate('main')} />}
+    {bundle && <GamePanel key={bundle.id} bundle={bundle} wearable={wearable} outbox={outbox} onSound={playSound} onStopSounds={stopSounds} onResult={() => setPending(outbox.list())} onChooseSong={() => navigate('library')} onMainMenu={() => navigate('main')} />}
     {!bundle && <footer className="site-footer"><button data-controller onClick={() => setDeveloperOpen(true)}>Developer tools</button><p>Camera tracking stays on this device.</p></footer>}
     {developerOpen && <ToolsDialog title="Developer tools" subtitle="Testing controls kept separate from the player experience." onClose={() => setDeveloperOpen(false)}><WearablePanel wearable={wearable} /><p className="help">Movement logs and chart diagnostics are available in Developer tools during a round.</p></ToolsDialog>}
   </main>;

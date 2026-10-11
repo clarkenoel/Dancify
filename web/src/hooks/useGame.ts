@@ -25,7 +25,10 @@ export function useGame(bundle: Bundle, wearable: WearableClient, interactionBlo
   useEffect(() => {
     const session = new GameSession(bundle.chart); engine.current = session;
     const video = videoRef.current!;
-    const output = new WearableFeedback(video, bundle.chart, wearable); feedback.current = output;
+    // Active buzzers are distracting during the dance. Keep beat/hit output an
+    // explicit development opt-in; controller input and results cues still work.
+    const output = new WearableFeedback(video, bundle.chart, wearable, undefined, undefined,
+      import.meta.env.VITE_DANCIFY_WEARABLE_METRONOME === 'true'); feedback.current = output;
     const playback = new PlaybackController(video, session, refresh, setError, () => !blocked.current && !controllerBlocked.current && readiness.current.isReady(performance.now()), true); controller.current = playback;
     setSnapshot(session.snapshot()); setError('');
     const stopForBackground = () => { if (document.hidden) { output.stop(); readiness.current.reset(); playback.cancelCountdown(); video.pause(); } };

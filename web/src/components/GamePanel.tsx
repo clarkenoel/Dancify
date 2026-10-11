@@ -4,30 +4,55 @@ import type { Bundle } from '../core/types';
 import { useGame } from '../hooks/useGame';
 import type { ResultOutbox } from '../core/outbox';
 import { PoseTarget } from './PoseTarget';
-import { TimingOverlay } from './TimingOverlay';
 import type { WearableClient } from '../core/WearableClient';
 import { CameraPanel, CameraSettings } from './CameraPanel';
 import { ToolsDialog } from './ToolsDialog';
 import { WearablePanel } from './WearablePanel';
 import { ConfirmDialog } from './ConfirmDialog';
+import { starRating } from '../core/starRating';
+import type { SoundEvent } from '../audio/SoundEffects';
 
-export function GamePanel({ bundle, wearable, outbox, onResult, onChooseSong, onMainMenu }: { bundle: Bundle; wearable: WearableClient; outbox: ResultOutbox; onResult: () => void; onChooseSong: () => void; onMainMenu: () => void; }) {
+export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onResult, onChooseSong, onMainMenu }: { bundle: Bundle; wearable: WearableClient; outbox: ResultOutbox; onSound: (event: SoundEvent, id?: string) => void; onStopSounds: () => void; onResult: () => void; onChooseSong: () => void; onMainMenu: () => void; }) {
   const [confirmation, setConfirmation] = useState<'restart' | 'library' | 'main' | null>(null);
   const [tools, setTools] = useState<'settings' | 'developer' | null>(null);
   const wearableState = useSyncExternalStore(wearable.subscribeState, wearable.snapshot);
   const game = useGame(bundle, wearable, confirmation !== null || tools !== null);
   const openTools = (screen: 'settings' | 'developer') => { game.pause(); setTools(screen); };
   const s = game.snapshot;
-  const [showTiming, setShowTiming] = useState(true);
   const [volume, setVolume] = useState(1);
   const confirm = (action: 'restart' | 'library' | 'main') => { game.pause(); setConfirmation(action); };
   const [showTargetSkeleton, setShowTargetSkeleton] = useState(false);
   const [character, setCharacter] = useState<Character>('lenny');
   const recorded = useRef<string | null>(null);
+  const announcedResult = useRef<string | null>(null);
+  const soundJudgments = useRef({ session: '', seen: new Set<string>() });
   const resultsRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!s.playing) onStopSounds();
+  }, [s.playing, onStopSounds]);
+  useEffect(() => () => onStopSounds(), [onStopSounds]);
+  useEffect(() => {
+    if (soundJudgments.current.session !== s.sessionId) soundJudgments.current = { session: s.sessionId, seen: new Set() };
+    const fresh = s.results.filter(result => !soundJudgments.current.seen.has(result.id));
+    for (const result of fresh) soundJudgments.current.seen.add(result.id);
+    // LOST is missing tracking, not a dance mistake. Never replay old misses on
+    // seek, resume or results, or use sounds to change the scoring clock.
+    if (document.hidden || !s.playing || s.ended || s.seeked) return;
+    for (const result of fresh) if (result.judgment === 'MISS') onSound('miss', `${s.sessionId}:${result.id}`);
+  }, [s.sessionId, s.results, s.playing, s.ended, s.seeked, onSound]);
   useEffect(() => {
     if (s.ended) resultsRef.current?.focus();
   }, [s.ended]);
+  useEffect(() => {
+    if (!s.ended || announcedResult.current === s.sessionId) return;
+    // Mark every completed session, even if disconnected/hidden, so reconnecting
+    // or returning to the tab cannot replay an old celebration.
+    announcedResult.current = s.sessionId;
+    const stars = starRating(s.accuracy, s.ended, s.seeked);
+    if (stars !== null && stars > 0 && !document.hidden && wearable.snapshot().status === 'connected') {
+      wearable.selectionFeedback();
+    }
+  }, [s.ended, s.sessionId, s.accuracy, s.seeked, wearable]);
   useEffect(() => {
     if (!s.ended || s.seeked || recorded.current === s.sessionId) return;
     recorded.current = s.sessionId;
@@ -70,12 +95,10 @@ export function GamePanel({ bundle, wearable, outbox, onResult, onChooseSong, on
         <div className="video-stage" style={{ position: 'relative', width: '100%' }}>
           {game.countdown !== null && <h2 className="countdown" role="status" aria-label="Replay countdown">Get ready — {game.countdown}</h2>}
           <video ref={game.videoRef} src={bundle.videoUrl} playsInline preload="metadata" width="640" style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', objectFit: 'contain' }} aria-label="Reference video" />
-          {showTiming && <TimingOverlay chart={bundle.chart} snapshot={s} showTargetSkeleton={showTargetSkeleton} character={character} />}
         </div>
 
         <p><button data-controller disabled={!s.playing && game.countdown === null && !game.ready} onClick={() => void game.toggle()}>{game.countdown !== null ? 'Cancel countdown' : s.playing ? 'Pause round' : 'Ready — start / resume'}</button>{' '}<button data-controller disabled={game.countdown !== null} onClick={() => confirm('restart')}>Replay round</button></p>
         {game.error && <p role="alert">{game.error}</p>}
-        <p>Diamonds mark detected music beats. Pose bars mark scoring windows. Use this view to check the chart against the music; it does not prove beat detection is correct. Native video fullscreen hides the overlay.</p>
       </section>
       <CameraPanel camera={game.camera} target={bundle.chart.moves.find(m => m.id === (s.activeId ?? s.upcomingIds[0]))} active={s.activeId !== null} showTargetSkeleton={showTargetSkeleton} character={character} />
     </div>
@@ -115,7 +138,7 @@ export function GamePanel({ bundle, wearable, outbox, onResult, onChooseSong, on
       <p>Wearable events control navigation and playback only. They never score a checkpoint.</p>
     </details>
 </section></div>
-      <details><summary>Chart diagnostics</summary>        <label><input type="checkbox" checked={showTiming} onChange={e => setShowTiming(e.target.checked)} /> Show timing overlay</label>    <section aria-label="Upcoming checkpoints"><h3>Upcoming checkpoints</h3>
+      <details><summary>Chart diagnostics</summary><section aria-label="Upcoming checkpoints"><h3>Upcoming checkpoints</h3>
       {s.upcomingIds.map(id => <PoseTarget key={id} move={bundle.chart.moves.find(m => m.id === id)!} showSkeleton={showTargetSkeleton} character={character} />)}
     </section></details>
     </ToolsDialog>

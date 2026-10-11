@@ -13,7 +13,8 @@ export class WearableFeedback {
   private lastObservation = 0;
   private handlers: [string, EventListener][] = [];
   constructor(private video: HTMLVideoElement, private chart: Dance, private wearable: WearableClient,
-    private hidden: () => boolean = () => document.hidden, private now: () => number = () => performance.now()) {
+    private hidden: () => boolean = () => document.hidden, private now: () => number = () => performance.now(),
+    private metronomeEnabled = true) {
     for (const type of ['pause', 'waiting', 'seeking', 'ended', 'error', 'ratechange']) {
       const handler = () => this.stop();
       video.addEventListener(type, handler); this.handlers.push([type, handler]);
@@ -36,7 +37,7 @@ export class WearableFeedback {
     this.lastTime = time; this.lastObservation = now;
     const fresh = snapshot.results.filter(result => !this.seen.has(result.id));
     for (const result of fresh) this.seen.add(result.id);
-    const enabled = this.wearable.snapshot().status === 'connected' && snapshot.playing && !snapshot.ended &&
+    const enabled = this.metronomeEnabled && this.wearable.snapshot().status === 'connected' && snapshot.playing && !snapshot.ended &&
       !this.hidden() && !this.video.paused && !this.video.seeking && this.video.readyState >= 2 && this.video.playbackRate === 1 &&
       this.chart.beat_times.some(beat => beat >= time);
     if (!enabled) { this.stop(); return; }
