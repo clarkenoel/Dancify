@@ -4,12 +4,26 @@ import { ResultOutbox } from './core/outbox';
 import type { Bundle, Mode, Play, PreparationOptions, Song } from './core/types';
 import { usePreparation } from './hooks/usePreparation';
 import { GamePanel } from './components/GamePanel';
+import { WearablePanel } from './components/WearablePanel';
+import { WearableClient } from './core/WearableClient';
+import { MenuNavigation } from './core/menuNavigation';
 
 const api = new DancifyApi();
 const outbox = new ResultOutbox(api, localStorage);
 const message = (e: unknown) => e instanceof Error ? e.message : 'Unexpected error';
 
 export default function App() {
+  const [wearable] = useState(() => new WearableClient());
+  const menu = useRef(new MenuNavigation());
+  const root = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const unsubscribe = wearable.subscribe(event => {
+      if (!root.current || document.hidden) return;
+      if (event.type === 'navigate') menu.current.move(root.current, event.direction === 'up' || event.direction === 'left' ? -1 : 1);
+      if (event.type === 'activate') menu.current.activate(root.current);
+    });
+    return () => { unsubscribe(); wearable.disconnect(); };
+  }, [wearable]);
   const [screen, setScreen] = useState<'main' | 'library'>('main');
   const [roundEnded, setRoundEnded] = useState(false);
   const [songs, setSongs] = useState<Song[]>([]);
@@ -86,17 +100,23 @@ export default function App() {
   const active = songs.find(s => s.id === selected);
   const job = preparation.job;
   const activeJob = job && (job.status === 'queued' || job.status === 'processing');
-  return <main>
+  return <main ref={root} onKeyDown={event => {
+    if (event.ctrlKey || event.altKey || event.metaKey || (event.target as HTMLElement).closest('input, textarea, select, video, [contenteditable="true"]')) return;
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      event.preventDefault(); menu.current.move(root.current!, event.key === 'ArrowUp' ? -1 : 1);
+    }
+  }}>
     <h1>Dancify</h1>
     <p>Development interface — visual components will be connected to the same game logic when the designs arrive.</p>
+    <WearablePanel wearable={wearable} />
     {error && <p role="alert">{error}</p>}
     {!bundle && <h2>{screen === 'main' ? 'Main menu' : 'Choose a song'}</h2>}
-    {!bundle && screen === 'library' && <button onClick={() => leaveGame('main')}>Main menu</button>}
+    {!bundle && screen === 'library' && <button data-controller onClick={() => leaveGame('main')}>Main menu</button>}
     <section hidden={!!bundle || screen === 'library'} aria-label="Prepare a song"><h2>Prepare a song</h2>
       <form onSubmit={create}>
         <p><label>Song title <input required maxLength={256} value={title} onChange={e => setTitle(e.target.value)} /></label></p>
         <p><label>Source <select aria-label="Source" value={source} onChange={e => setSource(e.target.value as 'url' | 'upload')}><option value="url">Video URL</option><option value="upload">Upload video with music</option></select></label></p>
-        {source === 'url' ? <p><label>Video URL <input type="url" required value={url} onChange={e => setUrl(e.target.value)} /></label></p> : <p><label>Video file <input type="file" accept="video/*" required onChange={e => setFile(e.target.files?.[0] ?? null)} /></label></p>}
+        {source === 'url' ? <p key="url"><label>Video URL <input type="url" required value={url} onChange={e => setUrl(e.target.value)} /></label></p> : <p key="upload"><label>Video file <input type="file" accept="video/*" required onChange={e => setFile(e.target.files?.[0] ?? null)} /></label></p>}
         <p>Choose a continuous solo-dancer clip with music. A file upload bypasses download failures, but must still pass timing and tracking checks.</p>
         <fieldset><legend>Optional choreography range (seconds)</legend>
           <label>Start time <input type="number" min="0" step="0.1" value={start} onChange={e => setStart(e.target.value)} /></label>{' '}
@@ -115,13 +135,13 @@ export default function App() {
     </section>
     <section hidden={!!bundle} aria-label="Song library"><h2>Songs</h2>
       <button onClick={() => void act(refresh)} disabled={busy}>Refresh songs</button>
-      <ul>{songs.map(song => <li key={song.id}><button aria-pressed={selected === song.id} onClick={() => select(song)}>{song.title}</button> — {song.status}{song.status === 'ready' && (!song.has_report || !song.active_bundle_id) ? ' (needs regeneration)' : ''}</li>)}</ul>
+      <ul>{songs.map(song => <li key={song.id}><button data-controller aria-pressed={selected === song.id} onClick={() => select(song)}>{song.title}</button> — {song.status}{song.status === 'ready' && (!song.has_report || !song.active_bundle_id) ? ' (needs regeneration)' : ''}</li>)}</ul>
       {active && <p><button disabled={busy || !!activeJob} onClick={() => void act(async () => preparation.watch(await api.prepare(active.id, options())))}>Prepare selected song / new range</button>{' '}
         <button disabled={loading || active.status !== 'ready'} onClick={() => void load(active.id)}>Load latest prepared bundle</button></p>}
       {loading && <p role="status">Loading prepared bundle…</p>}
     </section>
-    {bundle && <><label hidden={roundEnded}>Game mode <select value={mode} onChange={e => setMode(e.target.value as Mode)}><option value="keyboard_practice">Keyboard practice</option><option value="camera">Camera scoring</option></select></label>
-      <GamePanel key={`${bundle.id}:${mode}`} bundle={bundle} mode={mode} outbox={outbox} onResult={() => setPending(outbox.list())} onChooseSong={() => leaveGame('library')} onMainMenu={() => leaveGame('main')} onEndedChange={setRoundEnded} /></>}
+    {bundle && <><div hidden={roundEnded}><button data-controller onClick={() => setMode(mode === 'camera' ? 'keyboard_practice' : 'camera')}>Switch to {mode === 'camera' ? 'keyboard practice' : 'camera scoring'}</button></div><label hidden={roundEnded}>Game mode <select value={mode} onChange={e => setMode(e.target.value as Mode)}><option value="keyboard_practice">Keyboard practice</option><option value="camera">Camera scoring</option></select></label>
+      <GamePanel key={`${bundle.id}:${mode}`} bundle={bundle} mode={mode} wearable={wearable} outbox={outbox} onResult={() => setPending(outbox.list())} onChooseSong={() => leaveGame('library')} onMainMenu={() => leaveGame('main')} onEndedChange={setRoundEnded} /></>}
     <section hidden={!!bundle} aria-label="Pending results"><h2>Pending results</h2>
       {pending.length === 0 ? <p>No unsaved results.</p> : pending.map(item => <p key={item.result.client_session_id}>{item.result.player_name}: {item.result.score} ({item.result.mode}){' '}
         <button disabled={sending === item.result.client_session_id} onClick={() => { setSending(item.result.client_session_id); void act(async () => { await outbox.send(item); setPending(outbox.list()); }).finally(() => setSending(null)); }}>Retry pending result</button></p>)}

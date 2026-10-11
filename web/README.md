@@ -57,7 +57,7 @@ Existing data in `backend/data/` was preserved.
 Keyboard: Space toggles playback, R replays, left/right seek, and Enter hits a
 checkpoint in keyboard practice. Inputs/buttons retain normal keyboard behavior.
 The on-screen hit button also supports keyboard practice. Simulated wearable
-events only control playback/volume and never award points.
+events control ordered menu focus/selection and playback; they never award points.
 
 Seeking starts an unrecordable practice segment. Replay from the beginning to
 record a complete result. Changing mode or song resets the session and stops the
@@ -73,6 +73,9 @@ camera. Backgrounding the tab pauses the reference video.
   inference-frame dimensions. Golden portrait/landscape fixtures are shared.
 - Require all 12 mutually visible gameplay joints for scoring
   at confidence >=0.35. Preview normalization can still use a partial body. Invalid geometry yields `null` / LOST, not zero / MISS.
+- Chart loading now applies the scorer's own comparability check to every target.
+  Older partial-body or collapsed targets require regeneration before play;
+  the UI explains this instead of silently producing unavoidable LOST results.
 - Weighted joint-angle and limb-direction similarities favor arms. Provisional
   thresholds: PERFECT >=0.94, SUPER >=0.85, GOOD >=0.70; otherwise MISS.
 - Points: 1000/700/400/0. LOST awards no points and breaks combo but remains a
@@ -101,7 +104,7 @@ camera. Backgrounding the tab pauses the reference video.
 | `src/core/session.ts` | Pure checkpoint state machine and result construction |
 | `src/core/pose.ts` | Normalization and comparison; no React/DOM |
 | `src/core/outbox.ts` | Exact persisted save payload and idempotent retries |
-| `src/core/WearableClient.ts` | Fake event transport; future Bluetooth belongs here |
+| `src/core/WearableClient.ts` | BLE receiver, framed message parser, connection lifecycle and simulated input |
 | `src/components/` | Replaceable development controls and skeleton targets |
 
 Your designer can deliver components incrementally. Give a gameplay component
@@ -142,6 +145,26 @@ DANCIFY_TEST_API=http://127.0.0.1:8001 npm run test:browser
 Tests use `/usr/bin/chromium` by default; set `PLAYWRIGHT_CHROMIUM_EXECUTABLE`
 for another installation. The test runner starts Vite when needed. Stop any
 existing Vite instance using a different API before running the suite.
+
+`.github/workflows/web.yml` runs frontend tests/build and launcher tests on
+relevant pushes and pull requests, then prepares real media in a fresh temporary
+database for the browser suite. CI installs Playwright's matching Chromium;
+it never depends on existing prepared songs. Python contract fixture changes
+also trigger backend tests.
+
+To exercise the same isolated browser runner locally, with installed Python/web
+dependencies and Chromium:
+
+```bash
+PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium bash web/scripts/test-integration.sh
+```
+
+Run from the repository root. Optional `DANCIFY_TEST_API_PORT` and
+`DANCIFY_TEST_WEB_PORT` select unused ports (defaults 8765 and 5173). Occupied
+ports fail before startup. The helper stops only its own API; Playwright owns
+Vite. Test failures propagate as nonzero exit codes and retain diagnostics.
+GitHub execution still needs a pushed branch; local runs do not establish a
+green GitHub check or configure branch-protection requirements.
 
 The browser suite verifies real MP4 decoding, pause/seek/replay, keyboard scoring,
 immediate end scores despite history failures, end-screen navigation, local
@@ -197,6 +220,13 @@ replacement camera is explicit. Permission, unavailable-device, busy-camera and
 stalled-stream failures explain recovery; keyboard practice remains available.
 Preview mirroring does not change the existing unmirrored comparison convention.
 
+An independent watchdog stops the camera and pauses the round when a warmed-up
+inference or frame stream stalls for 2.5 seconds. Startup has a separate bounded
+model-loading/warmup allowance. Late results are discarded, including results
+arriving before a delayed timeout callback. Recovery requires enabling the camera
+and confirming readiness again. A browser timer cannot interrupt synchronous WASM
+that blocks the JavaScript thread; the deadline is checked again when control returns.
+
 Automated validation uses recorded dancer footage through a simulated webcam.
 A real-player trial on the demo machine is still required to complete W1's human
 acceptance gate and measure latency, framing and left/right usability.
@@ -210,7 +240,11 @@ compare both. Playback timing and scoring are unchanged.
 ### Replay and movement diagnostics
 
 Use **Replay round** during play or **Play again** on the results screen. The R
-shortcut also starts a new session, clearing scores and movement logs.
+shortcut also starts a new session, clearing scores and movement logs. Each replay
+shows a 3–2–1 countdown with video and scoring paused, then starts at the beginning.
+Cancel countdown (or Space) leaves playback paused. Changing mode/song, stopping
+or switching the camera, or hiding the tab cancels the pending start. Camera
+samples captured before the countdown finishes cannot score the new round.
 Download a log before replaying if you want to keep it. Seeking, changing the
 song or mode, and closing the page also discard the current log.
 
@@ -238,3 +272,48 @@ still can legitimately match a stationary target; no arbitrary movement penalty
 is applied. A whole-round perfect score against changing poses needs a log to
 identify whether the chart, tracking, or comparison is responsible. Movement delta
 is mean normalized joint displacement, not a calibrated activity or accuracy metric.
+
+
+### Before hardware/design: readiness and controller input
+
+Camera mode requires the whole body in frame for at least one second before the
+**Ready — start / resume** action becomes available. It then runs the countdown.
+This is framing readiness only: stand alone. The current model cannot count
+people, bind the wearer to a body, or recognize a face. More than 0.75 seconds of
+incomplete framing while playing pauses the round; regain framing and explicitly
+confirm Ready to resume. Camera failure/device change and backgrounding cancel
+pending starts. Readiness tolerates observation gaps up to the existing 2.5-second
+camera stall limit; it is not a calibrated motion or identity test.
+
+**Controller connection and testing** offers Connect ESP32 and a simulator.
+Windows Chrome/Edge connects through the Windows Bluetooth adapter directly;
+WSL still hosts the web/API processes. Use localhost or HTTPS. Unsupported
+browsers keep keyboard and simulation available. The user must initiate the
+Bluetooth picker; no automatic reconnect or hardware availability is assumed.
+
+The receiver uses the UUIDs in `../schema/wearable.protocol.md`, also recorded
+in the PRD. It subscribes to TX notifications and accepts the frozen UTF-8,
+newline-terminated messages, including split/coalesced lines. DIR:DOWN/RIGHT
+advances menu focus, DIR:UP/LEFT moves backwards, and BTN:CLICK activates the
+focused item. Button edges, HOLD and JOY do not select or score. The suggested
+rotary firmware mapping is clockwise → DIR:DOWN, counterclockwise → DIR:UP;
+confirm it with the firmware teammate before flashing. No wire contract changed.
+
+Up/Down arrows use the same ordered menu navigation. Text inputs/selects retain
+native behavior. Simulated Previous/Next/Select exercise it without an ESP32.
+Connection persists across songs; losing it pauses play/countdowns and requires
+reconnection or the explicit **Use keyboard controls** fallback. Reconnection
+never automatically resumes a round or identifies the wearer.
+
+Physical BLE acceptance is pending: advertise the frozen service and device-name
+prefix Dancify-Wearable, test rotation/button edges, then disconnection/reconnection
+on the actual Windows demo machine. Unit/browser doubles validate software paths,
+not radio reliability. RX beat/piezo command scheduling is not implemented in this
+increment. Multi-person tracking, face-model selection/enrollment, session identity,
+Figma integration, and real scoring calibration remain separate acceptance gates.
+
+Use [the teammate test checklist](TEAMMATE_TEST.md) for physical Windows trials.
+[The identity implementation proposal](IDENTITY_IMPLEMENTATION.md) records the
+candidate runtime dependencies and remaining integration gates. Its tested
+`PlayerLock` state machine is not yet connected to the live camera; continue
+testing with one person in frame.

@@ -47,8 +47,9 @@ and its immutable URLs available. Old generations are retained so in-progress
 games and their scores continue to refer to the selected bundle.
 
 Every move target must also contain a usable normalized pose: finite landmarks,
-at least six gameplay joints at visibility `>= 0.35`, and nonzero visible pose
-geometry. All-zero and low-visibility targets are rejected with HTTP 422.
+all twelve gameplay joints at visibility `>= 0.35`, and usable torso, angle and
+limb geometry matching the browser scorer. Partial-body or collapsed targets
+are rejected with HTTP 422. A rejected replacement preserves the old bundle.
 
 Uploading a new source video or changing `source_url` does not hide an existing
 ready generation. It changes only the next preparation input. A manual

@@ -11,10 +11,12 @@ from dancify_pipeline.beats import BeatTrack
 from dancify_pipeline.tracking import TrackingQualityError
 
 
+@pytest.mark.parametrize("hidden", ["none", "some", "all"])
 def test_pipeline_writes_synthetic_readiness_sidecar(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     valid_landmarks: np.ndarray,
+    hidden: str,
 ) -> None:
     video = tmp_path / "video.mp4"
     video.touch()
@@ -22,6 +24,10 @@ def test_pipeline_writes_synthetic_readiness_sidecar(
     times = np.arange(90) / 30.0
     frames = np.stack([valid_landmarks.copy() for _ in times])
     frames[:, 15, 0] += 0.1 * np.sin(times * np.pi)
+    if hidden == "some":
+        frames[20:40, 15, 3] = 0
+    elif hidden == "all":
+        frames[:, 15, 3] = 0
     valid = np.ones(len(times), dtype=bool)
     confidence = np.full(len(times), 0.95)
 
@@ -59,8 +65,14 @@ def test_pipeline_writes_synthetic_readiness_sidecar(
     monkeypatch.setattr(
         pipeline_module,
         "select_musical_hits",
-        lambda *_args, **_kwargs: (np.asarray([1.0]), np.asarray([30])),
+        lambda *_args, **_kwargs: (np.asarray([1.0, 2.0]), np.asarray([30, 60])),
     )
+
+    if hidden == "all":
+        with pytest.raises(RuntimeError, match="No usable motion hits"):
+            pipeline_module.run_pipeline(str(video), output, work_dir=tmp_path / "work", fallback_bpm=120, fallback_downbeat=0)
+        assert not output.exists()
+        return
 
     result = pipeline_module.run_pipeline(
         str(video),
@@ -71,6 +83,7 @@ def test_pipeline_writes_synthetic_readiness_sidecar(
     )
 
     report = json.loads(Path(result["report"]).read_text(encoding="utf-8"))
+    assert report["checkpoint_quality"] == {"selected": 2, "retained": 1 if hidden == "some" else 2, "omitted": 1 if hidden == "some" else 0}
     assert result["synthetic_timing"] is True
     assert result["cache_ready_by_default"] is False
     assert report["timing"]["source"] == "explicit_fallback"

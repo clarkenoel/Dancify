@@ -1,7 +1,7 @@
 # PRD — Dancify (Wearable Rhythm Game)
 
-**Version:** 1.2
-**Last updated:** 2026-10-10
+**Version:** 1.3 (working branch)
+**Last updated:** 2026-10-11
 **Owner:** [Your name]
 **Status:** Active development — 48-hour hackathon build
 
@@ -190,15 +190,17 @@ hip-center origin and torso-length scale.
 
 ### 5.2 `wearable.protocol.md`
 
-**Service UUID:** `[TBD — assign at Phase 0]`
-**RX Characteristic UUID:** `[TBD]` (browser writes)
-**TX Characteristic UUID:** `[TBD]` (ESP32 notifies)
+**Service UUID:** `7a2b0001-8f4c-4a6e-9b1d-3c5e7f9a0b1c`
+**RX Characteristic UUID:** `7a2b0002-8f4c-4a6e-9b1d-3c5e7f9a0b1c` (browser writes)
+**TX Characteristic UUID:** `7a2b0003-8f4c-4a6e-9b1d-3c5e7f9a0b1c` (ESP32 notifies)
+**Advertised device name prefix:** `Dancify-Wearable`
 
 **Existing frozen message formats (legacy joystick contract; rotary mapping pending):**
 - Browser → ESP32: `BPM:<int>`, `BEAT:<float>`, `HIT:1`, `TONE:<int>`, `SYNC:<float>`
 - ESP32 → browser: `JOY:<float>,<float>`, `DIR:<UP|DOWN|LEFT|RIGHT>`, `BTN:<DOWN|UP|CLICK|HOLD>`
 
-All messages UTF-8 strings, newline-terminated optional.
+All messages are UTF-8 strings and **must be newline-terminated**, as required by
+the authoritative [frozen protocol](schema/wearable.protocol.md).
 
 **Rotary transition:** §4.3 supersedes joystick input in the product design. The
 formats above document the currently frozen interface, not a requirement to send
@@ -207,6 +209,14 @@ decide whether rotary forward/back steps map to existing directional messages
 or require a reviewed protocol revision. No new wire messages, schema edits,
 firmware implementation, or sensor pin assignment are authorized by this PRD
 update alone. The single button remains; the wearable never contributes score.
+
+**Current integration status:** the browser receives directional/button BLE
+notifications and offers matching simulated menu controls. Browser-to-device
+beat/hit output and firmware are not implemented. The frozen protocol lacks a
+stop command, so it cannot yet express silence during pause/tracking loss/results.
+The [wearable output RFC](docs/handoffs/wearable-output-rfc.md) proposes reusing
+`DIR:DOWN`/`DIR:UP` for rotary navigation and adding an explicit output run state.
+That proposal is pending approval; it does not amend the frozen protocol.
 
 ---
 

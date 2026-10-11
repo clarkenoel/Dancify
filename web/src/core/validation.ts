@@ -1,4 +1,5 @@
-import type { Dance, Report } from './types';
+import type { Dance, Report, LandmarkTuple } from './types';
+import { analyzePose } from './pose';
 
 export class CompatibilityError extends Error {}
 function requireValue(condition: unknown, message: string): asserts condition {
@@ -9,7 +10,6 @@ function object(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
-const gameplay = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
 
 export function validateChart(value: unknown): Dance {
   const chart = object(value);
@@ -35,8 +35,8 @@ export function validateChart(value: unknown): Dance {
     requireValue(Array.isArray(move.keyframe_landmarks) && move.keyframe_landmarks.length === 33, 'Expected 33 landmarks');
     const pose = move.keyframe_landmarks;
     for (const p of pose) requireValue(Array.isArray(p) && p.length === 4 && p.every(finite) && p[3] >= 0 && p[3] <= 1, 'Invalid landmark');
-    const visible = gameplay.filter(i => pose[i][3] >= 0.35);
-    requireValue(visible.length >= 6 && visible.some(i => pose[i].slice(0, 3).some((v: number) => Math.abs(v) > 1e-8)), 'Unusable target pose');
+    requireValue(analyzePose(pose as LandmarkTuple[], pose as LandmarkTuple[]).similarity !== null,
+      `Checkpoint ${move.id} cannot be scored: all 12 body joints and usable limb geometry are required. Prepare this song again with the current pipeline or choose a clearer clip.`);
   }
   return chart as unknown as Dance;
 }
@@ -58,6 +58,11 @@ export function validateReport(value: unknown, chart: Dance, songId: string, bun
   requireValue(finite(valid) && Number.isInteger(valid) && finite(total) && Number.isInteger(total) && valid > 0 && valid <= total, 'Invalid tracking counts');
   requireValue(finite(ratio) && ratio >= 0.5 && ratio <= 1 && Math.abs(ratio - valid / total) < 0.0001, 'Unusable tracking coverage');
   for (const name of ['longest_invalid_seconds', 'trailing_invalid_seconds']) requireValue(finite(tracking[name]) && tracking[name] >= 0 && tracking[name] <= 2.000001, 'Reference tracking is unstable');
+  if (r.checkpoint_quality !== undefined) {
+    const q = object(r.checkpoint_quality);
+    requireValue([q.selected, q.retained, q.omitted].every(v => finite(v) && Number.isSafeInteger(v) && v >= 0), 'Invalid checkpoint counts');
+    requireValue(q.retained === chart.moves.length && (q.selected as number) === (q.retained as number) + (q.omitted as number), 'Checkpoint counts disagree with chart');
+  }
   const cache = object(r.cache);
   requireValue(cache.song_id === songId && cache.bundle_id === bundleId, 'Bundle identity changed while loading');
   return r as unknown as Report;

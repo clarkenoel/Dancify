@@ -1,0 +1,358 @@
+{
+  "description": "Target acceptance examples shared by pipeline, API and actual browser scorer. Overrides apply to the first normalized golden pose.",
+  "cases": [
+    {
+      "name": "full-body",
+      "expected": true,
+      "overrides": {}
+    },
+    {
+      "name": "visibility-boundary",
+      "expected": true,
+      "overrides": {
+        "15": [
+          -1.5,
+          0,
+          0,
+          0.35
+        ]
+      }
+    },
+    {
+      "name": "collapsed-torso",
+      "expected": false,
+      "overrides": {
+        "11": [
+          -0.25,
+          0,
+          0,
+          0.95
+        ],
+        "12": [
+          0.25,
+          0,
+          0,
+          0.95
+        ]
+      }
+    },
+    {
+      "name": "hidden-joint-11",
+      "expected": false,
+      "overrides": {
+        "11": [
+          -0.5,
+          -1.0,
+          0.0,
+          0.349999
+        ]
+      }
+    },
+    {
+      "name": "hidden-joint-12",
+      "expected": false,
+      "overrides": {
+        "12": [
+          0.5,
+          -1.0,
+          0.0,
+          0.349999
+        ]
+      }
+    },
+    {
+      "name": "hidden-joint-13",
+      "expected": false,
+      "overrides": {
+        "13": [
+          -1.0,
+          -0.5,
+          0.0,
+          0.349999
+        ]
+      }
+    },
+    {
+      "name": "hidden-joint-14",
+      "expected": false,
+      "overrides": {
+        "14": [
+          1.0,
+          -0.5,
+          0.0,
+          0.349999
+        ]
+      }
+    },
+    {
+      "name": "hidden-joint-15",
+      "expected": false,
+      "overrides": {
+        "15": [
+          -1.5,
+          0.0,
+          0.0,
+          0.349999
+        ]
+      }
+    },
+    {
+      "name": "hidden-joint-16",
+      "expected": false,
+      "overrides": {
+        "16": [
+          1.5,
+          0.0,
+          0.0,
+          0.349999
+        ]
+      }
+    },
+    {
+      "name": "hidden-joint-23",
+      "expected": false,
+      "overrides": {
+        "23": [
+          -0.25,
+          0.0,
+          0.0,
+          0.349999
+        ]
+      }
+    },
+    {
+      "name": "hidden-joint-24",
+      "expected": false,
+      "overrides": {
+        "24": [
+          0.25,
+          0.0,
+          0.0,
+          0.349999
+        ]
+      }
+    },
+    {
+      "name": "hidden-joint-25",
+      "expected": false,
+      "overrides": {
+        "25": [
+          -0.3,
+          1.0,
+          0.0,
+          0.349999
+        ]
+      }
+    },
+    {
+      "name": "hidden-joint-26",
+      "expected": false,
+      "overrides": {
+        "26": [
+          0.3,
+          1.0,
+          0.0,
+          0.349999
+        ]
+      }
+    },
+    {
+      "name": "hidden-joint-27",
+      "expected": false,
+      "overrides": {
+        "27": [
+          -0.3,
+          1.75,
+          0.0,
+          0.349999
+        ]
+      }
+    },
+    {
+      "name": "hidden-joint-28",
+      "expected": false,
+      "overrides": {
+        "28": [
+          0.3,
+          1.75,
+          0.0,
+          0.349999
+        ]
+      }
+    },
+    {
+      "name": "collapsed-limb-11-13",
+      "expected": false,
+      "overrides": {
+        "13": [
+          -0.5,
+          -1.0,
+          0.0,
+          0.95
+        ]
+      }
+    },
+    {
+      "name": "collapsed-limb-13-15",
+      "expected": false,
+      "overrides": {
+        "15": [
+          -1.0,
+          -0.5,
+          0.0,
+          0.95
+        ]
+      }
+    },
+    {
+      "name": "collapsed-limb-12-14",
+      "expected": false,
+      "overrides": {
+        "14": [
+          0.5,
+          -1.0,
+          0.0,
+          0.95
+        ]
+      }
+    },
+    {
+      "name": "collapsed-limb-14-16",
+      "expected": false,
+      "overrides": {
+        "16": [
+          1.0,
+          -0.5,
+          0.0,
+          0.95
+        ]
+      }
+    },
+    {
+      "name": "collapsed-limb-23-25",
+      "expected": false,
+      "overrides": {
+        "25": [
+          -0.25,
+          0.0,
+          0.0,
+          0.95
+        ]
+      }
+    },
+    {
+      "name": "collapsed-limb-25-27",
+      "expected": false,
+      "overrides": {
+        "27": [
+          -0.3,
+          1.0,
+          0.0,
+          0.95
+        ]
+      }
+    },
+    {
+      "name": "collapsed-limb-24-26",
+      "expected": false,
+      "overrides": {
+        "26": [
+          0.25,
+          0.0,
+          0.0,
+          0.95
+        ]
+      }
+    },
+    {
+      "name": "collapsed-limb-26-28",
+      "expected": false,
+      "overrides": {
+        "28": [
+          0.3,
+          1.0,
+          0.0,
+          0.95
+        ]
+      }
+    },
+    {
+      "name": "extreme-coordinates",
+      "expected": false,
+      "overrides": {
+        "11": [
+          -5e+159,
+          -1e+160,
+          0.0,
+          0.95
+        ],
+        "12": [
+          5e+159,
+          -1e+160,
+          0.0,
+          0.95
+        ],
+        "13": [
+          -1e+160,
+          -5e+159,
+          0.0,
+          0.95
+        ],
+        "14": [
+          1e+160,
+          -5e+159,
+          0.0,
+          0.95
+        ],
+        "15": [
+          -1.5e+160,
+          0.0,
+          0.0,
+          0.95
+        ],
+        "16": [
+          1.5e+160,
+          0.0,
+          0.0,
+          0.95
+        ],
+        "23": [
+          -2.5e+159,
+          0.0,
+          0.0,
+          0.95
+        ],
+        "24": [
+          2.5e+159,
+          0.0,
+          0.0,
+          0.95
+        ],
+        "25": [
+          -2.9999999999999998e+159,
+          1e+160,
+          0.0,
+          0.95
+        ],
+        "26": [
+          2.9999999999999998e+159,
+          1e+160,
+          0.0,
+          0.95
+        ],
+        "27": [
+          -2.9999999999999998e+159,
+          1.75e+160,
+          0.0,
+          0.95
+        ],
+        "28": [
+          2.9999999999999998e+159,
+          1.75e+160,
+          0.0,
+          0.95
+        ]
+      }
+    }
+  ]
+}

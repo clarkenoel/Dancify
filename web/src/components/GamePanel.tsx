@@ -4,10 +4,11 @@ import { useGame } from '../hooks/useGame';
 import type { ResultOutbox } from '../core/outbox';
 import { PoseTarget } from './PoseTarget';
 import { TimingOverlay } from './TimingOverlay';
+import type { WearableClient } from '../core/WearableClient';
 import { CameraPanel } from './CameraPanel';
 
-export function GamePanel({ bundle, mode, outbox, onResult, onChooseSong, onMainMenu, onEndedChange }: { bundle: Bundle; mode: Mode; outbox: ResultOutbox; onResult: () => void; onChooseSong: () => void; onMainMenu: () => void; onEndedChange: (ended: boolean) => void }) {
-  const game = useGame(bundle, mode);
+export function GamePanel({ bundle, mode, wearable, outbox, onResult, onChooseSong, onMainMenu, onEndedChange }: { bundle: Bundle; mode: Mode; wearable: WearableClient; outbox: ResultOutbox; onResult: () => void; onChooseSong: () => void; onMainMenu: () => void; onEndedChange: (ended: boolean) => void }) {
+  const game = useGame(bundle, mode, wearable);
   const s = game.snapshot;
   const [showTiming, setShowTiming] = useState(true);
   const recorded = useRef<string | null>(null);
@@ -30,28 +31,32 @@ export function GamePanel({ bundle, mode, outbox, onResult, onChooseSong, onMain
   const replay = () => { void game.replay(); };
   return <section aria-label="Game">
     <h2>{bundle.song.title}</h2>
+    {!!bundle.report.checkpoint_quality?.omitted && <p role="status">Preparation omitted {bundle.report.checkpoint_quality.omitted} of {bundle.report.checkpoint_quality.selected} checkpoints because their body tracking could not be scored. {bundle.report.checkpoint_quality.retained} playable checkpoints remain.</p>}
     {s.ended && <section aria-label="Results" ref={resultsRef} tabIndex={-1}>
       <h3>Session complete</h3>
       <p aria-label="Final score"><strong>Final score: {s.score}</strong></p>
       <p>Best combo: {s.maxCombo} · Accuracy: {s.accuracy === null ? 'No comparable poses' : `${(s.accuracy * 100).toFixed(1)}%`}</p>
       <p>{Object.entries(s.judgments).map(([j, n]) => `${j}: ${n}`).join(' · ')}</p>
       {s.seeked && <p>Practice segment — replay from the beginning for a complete round.</p>}
-      <p><button onClick={replay}><strong>Play again</strong></button>{' '}
-        <button onClick={onChooseSong}>Choose another song</button>{' '}
-        <button onClick={onMainMenu}>Main menu</button></p>
+      <p><button data-controller onClick={replay}><strong>Play again</strong></button>{' '}
+        <button data-controller onClick={onChooseSong}>Choose another song</button>{' '}
+        <button data-controller onClick={onMainMenu}>Main menu</button></p>
     </section>}
     <div hidden={s.ended}>
+    {game.controllerWarning && <p role="alert">{game.controllerWarning} <button data-controller onClick={game.useKeyboardControls}>Use keyboard controls</button></p>}
+    {mode === 'camera' && !s.playing && game.countdown === null && <p role="status">{game.ready ? 'Framing ready. Confirm Ready to start or resume.' : 'Stand alone and keep shoulders, wrists, hips, knees and ankles in view for one second.'}</p>}
     <p>{mode === 'camera' ? 'Camera scoring' : 'Keyboard practice — separate from camera scores'}</p>
     {bundle.report.cache.source_kind === 'manual' && <p>This bundle was supplied manually with a validated report; its media provenance was not verified by the preparation worker.</p>}
     <div aria-label="Practice video feeds" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 28rem), 1fr))', gap: '1rem', alignItems: 'start', maxWidth: mode === 'camera' ? 1280 : 640 }}>
       <section aria-label="Reference player" style={{ minWidth: 0 }}>
         <h3>Reference dance</h3>
+        {game.countdown !== null && <h2 role="status" aria-label="Replay countdown">Get ready — {game.countdown}</h2>}
         <div style={{ position: 'relative', width: '100%' }}>
-          <video ref={game.videoRef} src={bundle.videoUrl} controls playsInline preload="metadata" width="640" style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', objectFit: 'contain' }} aria-label="Reference video" />
+          <video ref={game.videoRef} src={bundle.videoUrl} controls={mode !== 'camera'} playsInline preload="metadata" width="640" style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', objectFit: 'contain' }} aria-label="Reference video" />
           {showTiming && <TimingOverlay chart={bundle.chart} snapshot={s} mode={mode} />}
         </div>
         <label><input type="checkbox" checked={showTiming} onChange={e => setShowTiming(e.target.checked)} /> Show timing overlay</label>
-        <p><button onClick={() => void game.toggle()}>Play / pause</button>{' '}<button onClick={replay}>Replay round</button></p>
+        <p><button data-controller disabled={mode === 'camera' && !s.playing && game.countdown === null && !game.ready} onClick={() => void game.toggle()}>{game.countdown !== null ? 'Cancel countdown' : mode === 'camera' ? (s.playing ? 'Pause round' : 'Ready — start / resume') : 'Play / pause'}</button>{' '}<button data-controller disabled={game.countdown !== null} onClick={replay}>Replay round</button></p>
         {game.error && <p role="alert">{game.error}</p>}
         <p>Diamonds mark detected music beats. Pose bars mark scoring windows; press Enter during a bar in keyboard practice. Arrow keys still seek. Use this view to check the chart against the music; it does not prove beat detection is correct. Native video fullscreen hides the overlay.</p>
       </section>
@@ -76,10 +81,10 @@ export function GamePanel({ bundle, mode, outbox, onResult, onChooseSong, onMain
       <table><caption>Checkpoint scoring evidence</caption><thead><tr><th>Checkpoint</th><th>Judgment</th><th>Similarity</th><th>Best sample (seconds)</th></tr></thead>
         <tbody>{s.results.map(r => <tr key={r.id}><td>{r.id}</td><td>{r.judgment}</td><td>{r.similarity?.toFixed(4) ?? '—'}</td><td>{r.bestSampleTime?.toFixed(3) ?? '—'}</td></tr>)}</tbody></table>
     </details>}
-    <div hidden={s.ended}><details><summary>Simulate wearable controls</summary>
+    <div hidden={s.ended}><p><button data-controller onClick={onChooseSong}>Choose another song</button>{' '}<button data-controller onClick={onMainMenu}>Main menu</button></p><details><summary>Simulate wearable controls</summary>
       <button onClick={() => game.wearable.simulate({ type: 'togglePlayback' })}>Wearable play / pause</button>{' '}
-      <button onClick={() => game.wearable.simulate({ type: 'navigate', direction: 'up' })}>Wearable volume up</button>
-      <p>Wearable events control playback only. They never score a checkpoint.</p>
+      <button onClick={() => game.wearable.simulate({ type: 'navigate', direction: 'down' })}>Wearable next item</button>
+      <p>Wearable events control navigation and playback only. They never score a checkpoint.</p>
     </details>
     <section aria-label="Upcoming checkpoints"><h3>Upcoming checkpoints</h3>
       {s.upcomingIds.map(id => <PoseTarget key={id} move={bundle.chart.moves.find(m => m.id === id)!} />)}

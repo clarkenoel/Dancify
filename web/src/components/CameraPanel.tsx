@@ -23,7 +23,7 @@ export function CameraPanel({ camera, target, active }: { camera: ReturnType<typ
     <button onClick={() => void camera.refreshDevices()}>Refresh cameras</button>
     <p>Switching cameras pauses the dance and stops the previous camera. Enable the selected camera to continue.</p>
     <p>
-      <button onClick={() => void camera.startCamera()} disabled={camera.cameraState !== 'off'}>{camera.cameraState === 'starting' ? 'Starting camera…' : camera.cameraState === 'ready' ? 'Camera on' : 'Enable camera'}</button>{' '}
+      <button data-controller onClick={() => void camera.startCamera()} disabled={camera.cameraState !== 'off'}>{camera.cameraState === 'starting' ? 'Starting camera…' : camera.cameraState === 'ready' ? 'Camera on' : 'Enable camera'}</button>{' '}
       <button onClick={camera.stopCamera} disabled={camera.cameraState === 'off'}>Stop camera</button>
     </p>
     <p role="status" aria-label="Body tracking status">{camera.tracking}</p>

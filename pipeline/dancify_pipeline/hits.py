@@ -6,7 +6,7 @@ import numpy as np
 from scipy.ndimage import uniform_filter1d
 from scipy.signal import find_peaks
 
-from .tracking import usable_keyframe
+from .scoring_contract import scorable_pose
 
 
 def _smooth_energy(energy: np.ndarray, frames: int = 7) -> np.ndarray:
@@ -302,7 +302,8 @@ def build_moves(
             fi = int(np.argmin(np.abs(times - t)))
         if frame_valid is not None and not bool(frame_valid[fi]):
             continue
-        if not usable_keyframe(frames[fi]):
+        # Validate the exact rounded coordinates that will be serialized.
+        if not scorable_pose([[round(float(x), 6) for x in row] for row in frames[fi]]):
             continue
         selected.append((float(t), fi))
 
