@@ -4,6 +4,7 @@ import type { Bundle } from '../core/types';
 import { useGame } from '../hooks/useGame';
 import type { ResultOutbox } from '../core/outbox';
 import { PoseTarget } from './PoseTarget';
+import { PictographTimeline } from './PictographTimeline';
 import type { WearableClient } from '../core/WearableClient';
 import { CameraPanel, CameraSettings } from './CameraPanel';
 import { ToolsDialog } from './ToolsDialog';
@@ -101,12 +102,13 @@ export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onR
         <div className="video-stage" style={{ position: 'relative', width: '100%' }}>
           {game.countdown !== null && <h2 className="countdown" role="status" aria-label="Replay countdown">Get ready — {game.countdown}</h2>}
           <video ref={game.videoRef} src={bundle.videoUrl} playsInline preload="metadata" width="640" style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', objectFit: 'contain' }} aria-label="Reference video" />
+          <PictographTimeline moves={bundle.chart.moves} time={s.time} character={character} showSkeleton={showTargetSkeleton} />
         </div>
 
         <p><button data-controller onClick={() => void game.toggle()}>{game.countdown !== null ? 'Cancel countdown' : s.playing ? 'Pause round' : s.time > 0 ? 'Resume dance' : 'Start dance'}</button>{' '}<button data-controller disabled={game.countdown !== null} onClick={() => confirm('restart')}>Replay round</button></p>
         {game.error && <p role="alert">{game.error}</p>}
       </section>
-      <CameraPanel camera={game.camera} target={bundle.chart.moves.find(m => m.id === (s.activeId ?? s.upcomingIds[0]))} active={s.activeId !== null} showTargetSkeleton={showTargetSkeleton} character={character} />
+      <CameraPanel camera={game.camera} />
     </div>
 
     {s.seeked && <p>This is a practice segment. Replay from the beginning to record a complete result.</p>}

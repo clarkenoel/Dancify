@@ -307,3 +307,47 @@ dialog .action-row { justify-content: center; margin-block: var(--space-6); }
   .loading-stars img:first-child { opacity: 1; }
 }
 
+
+/* Approved demo cue strip, 2026-10-11; existing rink tokens and artist rig.
+   Positions derive from video time, without a CSS animation clock. */
+.pictograph-timeline {
+  position: absolute; right: var(--space-2); bottom: var(--space-2); z-index: 1;
+  width: min(72%, 40rem); height: clamp(96px, 11vw, 136px);
+  overflow: hidden; pointer-events: none; color: var(--text);
+  background: color-mix(in srgb, var(--background) 88%, transparent);
+  border-bottom: 3px solid var(--aqua); border-radius: var(--radius);
+}
+.pictograph-cues { position: relative; height: 100%; }
+.pictograph-marker {
+  position: absolute; left: 14%; inset-block: var(--space-2); transform: translateX(-50%);
+  width: 3px; background: var(--aqua); color: var(--aqua);
+}
+.pictograph-marker > span {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  background: var(--background); padding-inline: var(--space-2);
+  font-size: 1rem; line-height: 1.25;
+}
+.pictograph-cue {
+  position: absolute; bottom: var(--space-1); height: calc(100% - var(--space-6));
+  width: clamp(56px, 6vw, 96px); transform: translateX(-50%); opacity: .75;
+}
+.pictograph-cue.is-current { opacity: 1; filter: drop-shadow(0 0 4px var(--aqua)); z-index: 1; }
+.pictograph-cue .timeline-pose, .pictograph-cue .timeline-pose svg { width: 100%; height: 100%; display: block; }
+.pictograph-static-label { display: none; }
+.pictograph-empty {
+  position: absolute; inset: var(--space-6) var(--space-2) var(--space-2) 24%;
+  display: grid; place-items: center; text-align: center; font-size: 1rem;
+}
+@media (max-width: 800px) {
+  .pictograph-timeline { width: calc(100% - var(--space-4)); height: 96px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pictograph-marker { display: none; }
+  .pictograph-cues { display: flex; align-items: stretch; }
+  .pictograph-cue {
+    position: relative; left: auto !important; bottom: auto; transform: none;
+    flex: 0 0 25%; width: 25%; height: 100%; padding: var(--space-1);
+  }
+  .pictograph-cue .timeline-pose { height: calc(100% - var(--space-5)); }
+  .pictograph-static-label { display: block; text-align: center; font-size: 1rem; line-height: 1.25; color: var(--aqua); }
+}

@@ -464,3 +464,16 @@ star rating or progress percentage is displayed.
 
 See [design integration status](DESIGN_INTEGRATION.md) for approved references,
 remaining screen work and the agreed star thresholds.
+
+
+## Sliding pictograph demo (2026-10-11)
+
+The approved demo layout places up to four current/upcoming Lenny or Human targets
+over the bottom-right of the reference video with a six-second preview. Position
+comes only from the existing video-time snapshot. A target reaches NOW at its
+checkpoint start and stays there until its window closes; this is a visual cue,
+not an exact-hit or hold-scoring change. Pause/countdown/buffering freeze the
+strip; replay/seek reset it. Reduced motion shows a stationary current/next row.
+The artist rig and rink tokens are reused; overlay dimensions are provisional
+demo styling approved in chat, not measured from a new Figma frame. The duplicate
+static camera target is removed. Manual Start and upper-body demo scoring remain.
