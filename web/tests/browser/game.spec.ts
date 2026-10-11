@@ -170,6 +170,16 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   expect(narrowCamera!.x + narrowCamera!.width).toBeLessThanOrEqual(390);
   await page.setViewportSize({ width: 1280, height: 720 });
 
+  // Software-rendered CI can hit the production inference watchdog while resizing.
+  // Verify its recovery contract before beginning the separate injected-stall test.
+  if (await page.getByRole('button', { name: 'Enable camera', exact: true }).count()) {
+    await expect(page.getByRole('alert')).toContainText('stopped responding');
+    expect(await page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+    await expect.poll(() => skeleton.evaluate((c: HTMLCanvasElement) => c.width)).toBe(0);
+    await page.getByRole('button', { name: 'Enable camera', exact: true }).click();
+    await expect(page.getByLabel('Body tracking status')).toContainText(/Ready|Tracking body/, { timeout: 40000 });
+  }
+
   await page.getByRole('checkbox', { name: 'Show body skeleton' }).uncheck();
   await expect(page.getByRole('checkbox', { name: 'Show body skeleton' })).not.toBeChecked();
   await page.getByRole('checkbox', { name: 'Show body skeleton' }).check();
