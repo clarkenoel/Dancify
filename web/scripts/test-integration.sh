@@ -39,6 +39,9 @@ export XDG_CACHE_HOME="$RUN_DIR/cache"
 export DANCIFY_PIPELINE_PYTHON="$REPO_DIR/pipeline/.venv/bin/python"
 export DANCIFY_CORS_ORIGINS="http://127.0.0.1:$DANCIFY_TEST_WEB_PORT,http://localhost:$DANCIFY_TEST_WEB_PORT"
 export DANCIFY_TEST_API="http://127.0.0.1:$DANCIFY_TEST_API_PORT"
+# Exercise the same browser configuration after cache isolation, before starting
+# services or preparing media. Explicit browser paths/overrides remain inherited.
+(cd web && CI=1 ./node_modules/.bin/playwright test --config playwright.preflight.config.ts)
 backend/.venv/bin/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port "$DANCIFY_TEST_API_PORT" >"$RUN_DIR/backend.log" 2>&1 &
 api_pid=$!
 ready=0

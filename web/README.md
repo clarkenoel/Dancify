@@ -149,7 +149,9 @@ existing Vite instance using a different API before running the suite.
 `.github/workflows/web.yml` runs frontend tests/build and launcher tests on
 relevant pushes and pull requests, then prepares real media in a fresh temporary
 database for the browser suite. CI installs Playwright's matching Chromium;
-it never depends on existing prepared songs. Python contract fixture changes
+the browser job sets `PLAYWRIGHT_BROWSERS_PATH` for both installation and tests,
+so the runner's temporary `XDG_CACHE_HOME` cannot redirect browser discovery.
+It never depends on existing prepared songs. Python contract fixture changes
 also trigger backend tests.
 
 To exercise the same isolated browser runner locally, with installed Python/web
@@ -158,6 +160,21 @@ dependencies and Chromium:
 ```bash
 PLAYWRIGHT_CHROMIUM_EXECUTABLE=/usr/bin/chromium bash web/scripts/test-integration.sh
 ```
+
+To reproduce CI's downloaded-browser path instead of using system Chromium:
+
+```bash
+# Repository root; use the same absolute directory for installation and execution.
+export PLAYWRIGHT_BROWSERS_PATH=/tmp/dancify-playwright-browsers
+(cd web && ./node_modules/.bin/playwright install --with-deps chromium)
+env -u PLAYWRIGHT_CHROMIUM_EXECUTABLE bash web/scripts/test-integration.sh
+```
+
+After isolating caches, the runner first launches Chromium and renders a small
+page using the integration suite's browser options. Missing browsers or launch
+dependencies fail before API startup or media preparation. No fallback browser
+is silently selected. `PLAYWRIGHT_CHROMIUM_EXECUTABLE` remains an explicit local
+override.
 
 Run from the repository root. Optional `DANCIFY_TEST_API_PORT` and
 `DANCIFY_TEST_WEB_PORT` select unused ports (defaults 8765 and 5173). Occupied
