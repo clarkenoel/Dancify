@@ -11,6 +11,7 @@ import { WearablePanel } from './WearablePanel';
 import { ConfirmDialog } from './ConfirmDialog';
 import { starRating } from '../core/starRating';
 import type { SoundEvent } from '../audio/SoundEffects';
+import { ScoreStars } from './RinkArtwork';
 
 export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onResult, onChooseSong, onMainMenu }: { bundle: Bundle; wearable: WearableClient; outbox: ResultOutbox; onSound: (event: SoundEvent, id?: string) => void; onStopSounds: () => void; onResult: () => void; onChooseSong: () => void; onMainMenu: () => void; }) {
   const [confirmation, setConfirmation] = useState<'restart' | 'library' | 'main' | null>(null);
@@ -49,10 +50,11 @@ export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onR
     // Mark every completed session, even if disconnected/hidden, so reconnecting
     // or returning to the tab cannot replay an old celebration.
     announcedResult.current = s.sessionId;
+    if (finalStars !== null && !document.hidden) onSound(finalStars > 0 ? 'win' : 'lose', `${s.sessionId}:results`);
     if (finalStars !== null && finalStars > 0 && !document.hidden && wearable.snapshot().status === 'connected') {
       wearable.selectionFeedback();
     }
-  }, [s.ended, s.sessionId, finalStars, wearable]);
+  }, [s.ended, s.sessionId, finalStars, wearable, onSound]);
   useEffect(() => {
     if (!s.ended || s.seeked || recorded.current === s.sessionId) return;
     recorded.current = s.sessionId;
@@ -69,6 +71,7 @@ export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onR
     {!!bundle.report.checkpoint_quality?.omitted && <p role="status">Preparation omitted {bundle.report.checkpoint_quality.omitted} of {bundle.report.checkpoint_quality.selected} checkpoints because their body tracking could not be scored. {bundle.report.checkpoint_quality.retained} playable checkpoints remain.</p>}
     {s.ended && <section className="results-panel panel" aria-label="Results" ref={resultsRef} tabIndex={-1}>
       <p className="eyebrow">That’s a wrap</p><h2>Session complete</h2>
+      {finalStars !== null && <ScoreStars rating={finalStars} />}
       <p className="final-score" aria-label="Final score"><strong>Final score: {s.score}</strong></p>
       <p className="final-score star-rating" aria-label="Star rating">{finalStars === null
         ? s.seeked ? 'No rating for a practice segment' : 'Not enough tracking for a rating'
@@ -148,3 +151,4 @@ export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onR
     {confirmation && <ConfirmDialog title={confirmation === 'restart' ? 'Restart this dance?' : confirmation === 'library' ? 'Choose another song?' : 'Return to main menu?'} onCancel={() => setConfirmation(null)} onConfirm={() => { const action = confirmation; setConfirmation(null); if (action === 'restart') replay(); else if (action === 'library') onChooseSong(); else onMainMenu(); }} />}
   </section>;
 }
+

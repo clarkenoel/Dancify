@@ -5,6 +5,17 @@ import { GameSession } from '../src/core/session';
 import { chart, report } from './fixtures';
 import type { Preparation } from '../src/core/types';
 
+it('deletes a song using its escaped ID and accepts an empty 204 response', async () => {
+  const fetcher = vi.fn(async () => new Response(null, { status: 204 }));
+  await expect(new DancifyApi('http://api', fetcher).deleteSong('song/one')).resolves.toBeUndefined();
+  expect(fetcher).toHaveBeenCalledWith('http://api/songs/song%2Fone', { method: 'DELETE', cache: 'no-store' });
+});
+
+it('preserves the server deletion error so the library can show it without removing the song', async () => {
+  const fetcher = vi.fn(async () => Response.json({ detail: 'Could not delete song' }, { status: 500 }));
+  await expect(new DancifyApi('http://api', fetcher).deleteSong('song')).rejects.toThrow('Could not delete song');
+});
+
 it('pins all bundle requests to the selected generation', async () => {
   const fetcher = vi.fn(async (url: string | URL | Request) => {
     const u = String(url);

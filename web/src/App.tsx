@@ -10,6 +10,8 @@ import { ToolsDialog } from './components/ToolsDialog';
 import { MainMenu } from './components/MainMenu';
 import { MenuNavigation } from './core/menuNavigation';
 import { useSoundEffects } from './hooks/useSoundEffects';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { LoadingStars, RinkStars } from './components/RinkArtwork';
 
 const api = new DancifyApi();
 const outbox = new ResultOutbox(api, localStorage);
@@ -19,7 +21,8 @@ type Screen = 'main' | 'library' | 'prepare';
 // Figma main 15-237, library 15-358, prepare 15-259/15-281.
 // https://www.figma.com/design/73KXHiJcCoHRsR5XK54kQ7/Dancify-Roller-Rink-Redesign
 export default function App() {
-  const { play: playSound, stopGameplay: stopSounds } = useSoundEffects();
+  const [preparingAudio, setPreparingAudio] = useState(false);
+  const { play: playSound, stopGameplay: stopSounds } = useSoundEffects(preparingAudio);
   const [wearable] = useState(() => new WearableClient());
   const menu = useRef(new MenuNavigation());
   const root = useRef<HTMLElement>(null);
@@ -53,6 +56,7 @@ export default function App() {
   const [bundle, setBundle] = useState<Bundle | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState<Song | null>(null);
   const [loading, setLoading] = useState(false);
   const [libraryLoading, setLibraryLoading] = useState(true);
   const [source, setSource] = useState<'url' | 'upload'>('url');
@@ -128,6 +132,7 @@ export default function App() {
   const active = songs.find(s => s.id === selected);
   const job = preparation.job;
   const activeJob = job && (job.status === 'queued' || job.status === 'processing');
+  useEffect(() => { setPreparingAudio(!bundle && screen === 'prepare' && (busy || !!activeJob) && !preparation.error); }, [bundle, screen, busy, activeJob, preparation.error]);
   return <main ref={root} className="app-shell" onClickCapture={event => {
     const clicked = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
     if (clicked && !clicked.disabled) playSound('select');
@@ -168,7 +173,7 @@ export default function App() {
         </form>
         {job && <section className="preparation-status" aria-label="Preparation progress">
           <p role="status">Preparation: {job.status} · {job.stage}</p>
-          {activeJob && <progress aria-label="Preparing video" />}
+          {activeJob && <><LoadingStars /><progress aria-label="Preparing video" /></>}
           {job.error_code && <p role="alert">{preparationHelp[job.error_code]} {job.error_message}</p>}
           {job.has_diagnostic_video && <p><a href={api.artifact(job, 'diagnostic-video')} target="_blank" rel="noreferrer">View tracking diagnostic video</a></p>}
           {job.has_diagnostic && <p><a href={api.artifact(job, 'diagnostic')} target="_blank" rel="noreferrer">Tracking details</a></p>}
@@ -185,6 +190,7 @@ export default function App() {
           <span className="song-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
           <button className="song-choice" data-controller aria-pressed={selected === song.id} onClick={() => select(song)}>{song.title}</button>
           <span className="song-status">{song.status === 'ready' && (!song.has_report || !song.active_bundle_id) ? 'Needs regeneration' : song.status}{song.duration ? ` · ${Math.ceil(song.duration)}s` : ''}</span>
+          <button className="primary song-delete" data-controller aria-label={`Delete ${song.title}`} title={song.status === 'processing' || (activeJob && job.song_id === song.id) ? 'Wait for preparation to finish before deleting this song.' : pending.some(item => item.songId === song.id) ? 'Sync the pending score before deleting this song.' : 'Delete song and saved history'} disabled={busy || song.status === 'processing' || !!(activeJob && job.song_id === song.id) || pending.some(item => item.songId === song.id)} onClick={() => setDeleting(song)}>Delete song</button>
         </li>)}</ul>
         {active && <div className="panel"><h2>{active.title}</h2><div className="action-row"><button data-controller disabled={busy || !!activeJob} onClick={() => { setScreen('prepare'); void act(async () => preparation.watch(await api.prepare(active.id, options()))); }}>Prepare selected song / new range</button><button data-controller disabled={loading || active.status !== 'ready'} onClick={() => void load(active.id)}>Load latest prepared bundle</button></div></div>}
         {loading && <p role="status">Loading prepared bundle…</p>}
@@ -198,5 +204,7 @@ export default function App() {
     {bundle && <GamePanel key={bundle.id} bundle={bundle} wearable={wearable} outbox={outbox} onSound={playSound} onStopSounds={stopSounds} onResult={() => setPending(outbox.list())} onChooseSong={() => navigate('library')} onMainMenu={() => navigate('main')} />}
     {!bundle && <footer className="site-footer"><button data-controller onClick={() => setDeveloperOpen(true)}>Developer tools</button><p>Camera tracking stays on this device.</p></footer>}
     {developerOpen && <ToolsDialog title="Developer tools" subtitle="Testing controls kept separate from the player experience." onClose={() => setDeveloperOpen(false)}><WearablePanel wearable={wearable} /><p className="help">Movement logs and chart diagnostics are available in Developer tools during a round.</p></ToolsDialog>}
+    {deleting && <ConfirmDialog title={`Delete “${deleting.title}”?`} description="This removes the video, prepared dance and saved play history from your library. This cannot be undone." help="" confirmLabel="Delete song" onCancel={() => setDeleting(null)} onConfirm={() => { const song = deleting; setDeleting(null); void act(async () => { await api.deleteSong(song.id); if (selectedRef.current === song.id) { request.current?.abort(); setSelected(''); setBundle(null); setLoading(false); setHistory([]); } setSongs(previous => previous.filter(item => item.id !== song.id)); await refresh(); }); }} />}
+    <RinkStars />
   </main>;
 }

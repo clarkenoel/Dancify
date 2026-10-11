@@ -16,7 +16,4 @@ playback gain, with a lower gain for Miss1; the recordings themselves are unchan
 LOST tracking is not a scored miss and has no miss sound. Hidden tabs, old
 judgments, seeks and completed rounds do not produce catch-up miss sounds.
 
-Winning1, LoadingMusic, Losing4 and Milestone are not bundled: their supplied MP4
-files exceed the attachment downloader's size limit. Audio-only exports are still
-needed. No replacement music or result sounds were invented. The final star cue
-currently uses the wearable's existing short TONE command.
+The supplied LoadingMusic, Losing4, Milestone and Winning1 MP4 audio tracks were extracted locally using FFmpeg/libmp3lame quality 3, without trimming. loading.mp3 loops only during preparation. lose.mp3 plays once for an eligible zero-star result. result-win.mp3 concatenates Milestone then Winning1, in that order, for an eligible result with at least one star. Milestone is 24.53 seconds and the complete celebration is 81.38 seconds. Navigation, replay, hiding the tab and disposal stop playback. Reconnection never replays a completed result. These sounds never advance the video/scoring clock.

@@ -86,7 +86,7 @@ export class SoundEffects {
   async play(event: SoundEvent, id?: string): Promise<boolean> {
     if (this.disposed || !this.enabled || !this.context) return false;
     // Also stop when this response has no configured asset (for example results).
-    void this.setLoading(false);
+    if (!['menuMove', 'select'].includes(event)) void this.setLoading(false);
     const url = this.urls[event];
     if (!url) return false;
     const key = id === undefined ? null : `${event}:${id}`;

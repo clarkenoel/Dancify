@@ -219,3 +219,91 @@ dialog .action-row { justify-content: center; margin-block: var(--space-6); }
 .settings-grid .volume-control { justify-content: normal; width: 100%; text-align: left; }
 .settings-grid label:has(input[type=checkbox]) { display: flex; align-items: center; }
 .tools-board > [role=status] { text-align: center; }
+
+/* Live Figma 15:237, 15:358, 16:1193, 15:586, 33:54; inspected 2026-10-11.
+   Original vector exports keep their root dimensions and viewBox unchanged. */
+:root {
+  --caption: 1.5rem; --label: 1.75rem; --body: 2rem;
+  --title: 2.75rem; --display: 4rem; --score-size: 3.5rem;
+  --control-height: 5rem; --menu-height: 5rem; --menu-width: 20rem;
+}
+.app-shell { position: relative; isolation: isolate; }
+.app-shell button:not(.song-choice) {
+  position: relative; isolation: isolate; border: 0; border-radius: 0;
+  background: transparent; box-shadow: none; min-height: var(--control-height);
+  padding: var(--space-4) var(--space-8); font-size: var(--body);
+}
+.app-shell button:not(.song-choice)::before, .app-shell button:not(.song-choice)::after {
+  content: ''; position: absolute; z-index: -1; pointer-events: none;
+  mask-repeat: no-repeat; mask-size: 100% 100%;
+}
+.app-shell button:not(.song-choice)::before {
+  inset: 4px; background: var(--aqua); mask-image: url('./assets/rink/button-secondary.svg');
+}
+.app-shell button.primary:not(.song-choice)::before {
+  inset: 2px; mask-image: url('./assets/rink/button-primary.svg');
+}
+.app-shell button:not(.song-choice)::after {
+  inset: 8px; background: var(--blue); mask-image: url('./assets/rink/button-inset.svg');
+}
+.app-shell button:hover:not(:disabled):not(.song-choice)::before { background: var(--text); }
+.app-shell button[aria-pressed=true]:not(.song-choice)::before { background: var(--yellow); }
+.site-header, .design-header { height: auto; min-height: 143px; padding: var(--space-6); }
+.site-header .wordmark { color: var(--aqua); font-size: var(--title); }
+.site-header button { width: 280px; }
+.page { max-width: none; padding: var(--space-6); }
+.page-heading { min-height: 104px; margin-bottom: var(--space-6); }
+.page-heading h1, .page-main .page-heading h1 { font-size: var(--title); margin-bottom: var(--space-2); }
+.page-heading p, .page-main .page-heading p { font-size: var(--body); color: var(--muted); }
+.page-main .main-menu { padding: var(--space-8); min-height: 596px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--space-6); }
+.page-main .main-menu > *, .page-main .menu-actions { margin: 0; }
+.page-main .menu-kicker { font-size: var(--label); }
+.page-main .main-menu h2 { font-size: var(--display); }
+.page-main .menu-actions { gap: var(--space-6); }
+.page-main .menu-button { width: 280px; min-height: var(--control-height); font-size: var(--body); }
+.page-main .connection-badge { font-size: var(--body); min-height: 56px; padding: var(--space-3); margin: 0; }
+.page-main .theme-actions { gap: var(--space-8); }
+.page-main .theme-actions button { width: var(--menu-width); min-height: var(--control-height); font-size: var(--body); }
+.library-panel { background: var(--surface); padding: var(--space-8); border-radius: var(--space-4); }
+.song-list li { grid-template-columns: 3rem minmax(0,1fr) auto auto; border-color: var(--line); }
+.song-delete { width: 240px; min-width: 240px; white-space: nowrap; }
+.results-panel { max-width: none; min-height: 596px; border: 0; }
+.results-panel h2 { font-size: var(--display); }
+.results-panel .final-score { font-size: var(--score-size); }
+.results-panel .action-row button { width: var(--menu-width); }
+.score-stars { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--space-6); margin-block: var(--space-6); }
+.score-stars img { width: 112px; height: 112px; opacity: .2; object-fit: contain; }
+.score-stars img.earned { opacity: 1; }
+.loading-stars { display: block; position: relative; width: 80px; height: 80px; margin: var(--space-6) auto; }
+.loading-stars img { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; animation: loading-star 1.2s step-end infinite; }
+@keyframes loading-star { 0%, 24.99% { opacity: 1; } 25%, 100% { opacity: 0; } }
+.rink-stars { position: fixed; right: 0; bottom: 0; width: 420px; height: 330px; pointer-events: none; z-index: 1; }
+.rink-stars img { position: absolute; object-fit: contain; }
+.video-feeds { grid-template-columns: minmax(0,3fr) minmax(280px,1fr); }
+.game-hud { grid-template-columns: repeat(3,minmax(0,1fr)); background: var(--surface); border-radius: var(--space-4); padding: var(--space-6); }
+.game-hud .score-bar { grid-column: auto; grid-row: auto; font-size: var(--score-size); border: 0; padding: 0; }
+.game-hud .judgment { font-size: var(--body); }
+.game-hud p:last-child { grid-column: 1 / -1; color: var(--muted); }
+.page-main { padding-top: 9px; }
+.page-main .page-heading h1 { line-height: 1.1; }
+.page-main .page-heading p { line-height: 1.1; }
+.page-main .main-menu h2, .page-main .menu-kicker { margin: 0; }
+.page-main .theme-actions { width: min(100%, 672px); }
+.page-main .theme-actions button { flex: 1; }
+@media (max-width: 800px) {
+  :root { --body: 1.625rem; --title: 1.875rem; --display: 2.375rem; --score-size: 2.5rem; }
+  .page, .site-header { padding: var(--space-4); }
+  .site-header { min-height: 100px; }
+  .site-header button { width: auto; }
+  .page-main .main-menu { min-height: 0; padding: var(--space-10) var(--space-4); }
+  .video-feeds { grid-template-columns: 1fr; }
+  .song-list li { grid-template-columns: 2rem minmax(0,1fr); }
+  .song-delete, .song-status { grid-column: 2; }
+  .score-stars { gap: var(--space-2); }
+  .score-stars img { width: 56px; height: 56px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-stars img { animation: none; opacity: 0; }
+  .loading-stars img:first-child { opacity: 1; }
+}
+

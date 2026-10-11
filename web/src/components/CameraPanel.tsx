@@ -17,7 +17,7 @@ export function CameraPanel({ camera, target, active, showTargetSkeleton = false
 
     </p>
     <p role="status" aria-label="Body tracking status">{camera.tracking}</p>
-    {camera.feedback && <p>{camera.feedback.guidance} Visible scoring joints: {camera.feedback.visible}/12. {camera.inferenceMs} ms inference.</p>}
+    {camera.feedback && <p>{camera.feedback.guidance}</p>}
     {camera.error && <p role="alert">{camera.error}</p>}
     {camera.deviceError && <p role="alert">{camera.deviceError}</p>}
     <div aria-label="Camera target pose">

@@ -37,6 +37,17 @@ function setup(options: { fetchAudio?: (url: string, signal: AbortSignal) => Pro
 }
 
 describe('presentation audio lifecycle', () => {
+  it('lets selection feedback finish over preparation music and stops music at results', async () => {
+    const { sound, voices } = setup();
+    await sound.unlock();
+    await sound.setLoading(true);
+    await sound.play('select');
+    expect(voices[0].loop).toBe(true);
+    expect(voices[0].stop).not.toHaveBeenCalled();
+    await sound.play('win', 'round-results');
+    expect(voices[0].stop).toHaveBeenCalledOnce();
+    expect(await sound.play('win', 'round-results')).toBe(false);
+  });
   it('creates no audio context or pending playback before a real unlock action', async () => {
     const { sound, createContext } = setup();
     expect(await sound.play('select')).toBe(false);
