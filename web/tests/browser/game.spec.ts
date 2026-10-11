@@ -2,6 +2,11 @@ import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { recordCameraDiagnostics } from './camera-diagnostics';
+
+let cameraDiagnostics: Awaited<ReturnType<typeof recordCameraDiagnostics>>[] = [];
+test.beforeEach(() => { cameraDiagnostics = []; });
+test.afterEach(async ({}, info) => { for (const attach of cameraDiagnostics) await attach(info); });
 
 // Opt-in integration suite against the isolated development API. Seed it using
 // the commands in README.md; no production songs are deleted by these tests.
@@ -19,6 +24,7 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   // A real media fixture through getUserMedia, not mocked landmarks or a physical camera.
   const context = await browser.newContext({ permissions: ['camera'] });
   const page = await context.newPage();
+  cameraDiagnostics.push(await recordCameraDiagnostics(page));
   const external: string[] = [];
   page.on('request', r => { if (!r.url().startsWith('http://127.0.0.1') && !r.url().startsWith('blob:') && !r.url().startsWith('data:')) external.push(r.url()); });
   const songs = await (await request.get(`${api}/songs`)).json();
@@ -236,14 +242,19 @@ test('camera denial offers retry and menu exit without a keyboard scoring bypass
 
 test('camera rounds show immediate results, survive save failures, and replay with a countdown', async ({ page, request }) => {
   test.setTimeout(120000);
+  cameraDiagnostics.push(await recordCameraDiagnostics(page));
   const songs = await (await request.get(`${api}/songs`)).json();
   const song = songs.find((s: { status: string }) => s.status === 'ready');
   const saved: { client_session_id: string; mode: string; score: number }[] = [];
+  let acceptedSaves = 0;
   await page.route(`**/songs/${song.id}/plays`, async route => {
     if (route.request().method() !== 'POST') { await route.continue(); return; }
     saved.push(route.request().postDataJSON());
     // Ambiguous failure after server acceptance must not prevent local results.
-    await route.fetch(); await route.abort('failed');
+    const response = await route.fetch();
+    expect(response.ok()).toBe(true);
+    acceptedSaves++;
+    await route.abort('failed');
   });
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto('/');
@@ -290,6 +301,9 @@ test('camera rounds show immediate results, survive save failures, and replay wi
   await expect(results).toBeVisible({ timeout: 35000 });
   await expect.poll(() => saved.length).toBe(2);
   expect(saved[0].client_session_id).not.toBe(saved[1].client_session_id);
+  // Request arrival precedes the server transaction. Wait for acceptance before
+  // checking persistence; the browser still receives the ambiguous failure.
+  await expect.poll(() => acceptedSaves).toBe(2);
   const plays = await (await request.get(`${api}/songs/${song.id}/plays`)).json();
   for (const result of saved) expect(plays.filter((p: { client_session_id: string }) => p.client_session_id === result.client_session_id)).toHaveLength(1);
   await results.getByRole('button', { name: 'Choose another song' }).click();
@@ -332,6 +346,7 @@ test('camera-only BLE stays quiet, disconnect pauses, and a completed rating cue
   // Real model startup, two countdowns and the full round have independent
   // assertion limits. Let all of them finish on software-rendered CI workers.
   test.setTimeout(150000);
+  cameraDiagnostics.push(await recordCameraDiagnostics(page));
   const songs = await (await request.get(`${api}/songs`)).json();
   const song = songs.find((s: { status: string }) => s.status === 'ready');
   await page.goto('/');
