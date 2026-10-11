@@ -43,3 +43,19 @@ green GitHub check; the updated workflow must run after this change is pushed.
 The first publication used `runner.temp` in job-level `env`, which GitHub
 rejects because the runner context is unavailable there. It was replaced with
 `github.workspace`; actionlint verifies the corrected expression and workflow.
+
+## Camera test follow-up during publication
+
+The first publication checks on 2026-10-11 exposed camera-test timing failures on
+hosted runners: one report reached results before the automation completed its
+playback/fault-injection steps; other runs correctly entered inference-timeout
+recovery. The test now observes actual automatic playback and pauses in the
+same `playing` event, and injects the intentional model stall on a later playing
+event. This avoids relying on several browser round trips during a short clip.
+After proving the watchdog stops playback, the test releases its stalled promise
+so the original graph can close before a replacement camera/model starts.
+
+The real pose model, countdown assertions, scoring behavior and production
+watchdog deadlines are unchanged. The updated suite passed all nine scenarios
+locally. Hosted checks must pass before merge; these test changes do not declare
+an arbitrary hosted inference timeout acceptable or bypass its assertions.

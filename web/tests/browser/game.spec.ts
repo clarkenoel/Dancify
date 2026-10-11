@@ -116,12 +116,19 @@ test('official local model renders the dancer skeleton, switches cameras and cle
       if (text && observations.at(-1)?.text !== text) observations.push({ text, paused: document.querySelector<HTMLVideoElement>('[aria-label="Reference video"]')!.paused });
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    const reference = document.querySelector<HTMLVideoElement>('[aria-label="Reference video"]')!;
+    // Observe actual automatic playback and pause in the same event turn. A slow
+    // software-rendered CI browser may finish the short clip between RPCs.
+    Object.assign(window, { automaticPlaybackObserved: false });
+    reference.addEventListener('playing', () => {
+      Object.assign(window, { automaticPlaybackObserved: !reference.paused });
+      reference.pause();
+    }, { once: true });
     Object.assign(window, { countdownObservations: observations, stopCountdownObserver: () => observer.disconnect() });
   });
   await page.getByRole('button', { name: 'Enable camera' }).click();
   const automaticCountdown = page.getByRole('status', { name: 'Replay countdown' });
-  await expect(page.getByRole('button', { name: 'Pause round', exact: true })).toBeVisible({ timeout: 45000 });
-  await page.getByRole('button', { name: 'Pause round', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { automaticPlaybackObserved: boolean }).automaticPlaybackObserved), { timeout: 45000 }).toBe(true);
   const countdownObservations = await page.evaluate(() => {
     const state = window as unknown as { countdownObservations: { text: string; paused: boolean }[]; stopCountdownObserver: () => void };
     state.stopCountdownObserver(); return state.countdownObservations;
@@ -172,18 +179,23 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   await page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => { v.currentTime = 0; v.playbackRate = 0.5; });
   const ready = page.getByRole('button', { name: 'Ready — start / resume', exact: true });
   await expect(ready).toBeEnabled({ timeout: 40000 });
-  await ready.click();
-  await expect.poll(() => page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => v.paused), { timeout: 10000 }).toBe(false);
-  // Stall a real model call after normal startup; do not substitute landmarks.
+  // Arm the fault before starting, then inject at the real playing event. Never
+  // wait for a second browser round trip while the short video runs.
   await page.evaluate(() => {
-    const runtime = window as unknown as { Pose: { prototype: { send: (...args: unknown[]) => Promise<void> } }; restorePoseSend?: () => void };
+    const runtime = window as unknown as { Pose: { prototype: { send: (...args: unknown[]) => Promise<void> } }; restorePoseSend?: () => void; stallInjected?: boolean };
     const original = runtime.Pose.prototype.send;
     if (typeof original !== 'function') throw new Error('Pose send hook unavailable');
-    runtime.restorePoseSend = () => { runtime.Pose.prototype.send = original; };
-    runtime.Pose.prototype.send = () => new Promise<void>(() => {});
+    let release!: () => void;
+    const stalled = new Promise<void>(resolve => { release = resolve; });
+    runtime.restorePoseSend = () => { runtime.Pose.prototype.send = original; release(); };
+    document.querySelector<HTMLVideoElement>('[aria-label="Reference video"]')!.addEventListener('playing', () => {
+      runtime.Pose.prototype.send = () => { runtime.stallInjected = true; return stalled; };
+    }, { once: true });
   });
+  await ready.click();
   await expect(page.getByRole('alert')).toContainText('stopped responding', { timeout: 10000 });
   expect(await page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  expect(await page.evaluate(() => (window as unknown as { stallInjected: boolean }).stallInjected)).toBe(true);
   await page.evaluate(() => (window as unknown as { restorePoseSend: () => void }).restorePoseSend());
   const device = await page.getByLabel('Camera device', { exact: true }).locator('option').nth(1).getAttribute('value');
   await page.getByLabel('Camera device', { exact: true }).selectOption(device!);
