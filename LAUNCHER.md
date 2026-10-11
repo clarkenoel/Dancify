@@ -101,3 +101,30 @@ Actual service shutdown released both ports, and restart correctly overrode an
 existing `.env.local` API port without modifying that file. Duplicate launch and
 setup-while-running were rejected without disrupting the running application.
 Windows native acceptance remains pending as described above.
+
+## Automatically follow main for demos
+
+Use **Start Latest Dancify.cmd** (or `python3 scripts/demo.py` in WSL) to fetch
+and fast-forward a clean `main` checkout before launching. On the first launch
+and after a new revision, it runs setup to refresh dependencies and verify the
+frontend build. It then starts the updated launcher. Songs, history and ignored
+local configuration stay in place. Your existing **Start Dancify.cmd** continues
+to run the current checkout without updating; use it for feature branches/offline.
+
+One-time transition after these changes reach main (stop the launcher first):
+
+```bash
+cd ~/projects/justmakeit
+git fetch origin
+git switch main
+git pull --ff-only origin main
+```
+
+Then create your desktop shortcut to **Start Latest Dancify.cmd**. Updates are
+applied when you restart that launcher, not in the middle of a round. The helper
+refuses feature branches, tracked edits, untracked files, divergent/local commits,
+failed fetches, and an already-running launcher. It never resets or stashes work.
+If Git refuses the one-time switch, preserve/commit your work before proceeding.
+
+Updating does not sign you into any account or change your local database.
+Windows double-click behavior still requires validation on your Windows machine.
