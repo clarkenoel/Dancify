@@ -1,4 +1,4 @@
-# Wearable integration decision — proposed, not approved
+# Wearable integration decision — revision authorized, implementation pending
 
 Date: 2026-10-11. Tasks 4–5 of the pre-hardware work.
 
@@ -9,9 +9,12 @@ There is no firmware implementation in this repository yet. The frozen
 units/epoch of phase correction ambiguous. Starting an autonomous metronome with
 that interface cannot guarantee silence during pause, results or camera recovery.
 
-This proposal requires explicit approval to unfreeze only
-`schema/wearable.protocol.md`. The dance JSON schema and TypeScript chart mirror
-do not change. Until approval, this document is an RFC, not a firmware contract.
+On 2026-10-11 the user explicitly authorized unfreezing the schema in response
+to the request to revise `schema/wearable.protocol.md` for wearable feedback.
+That authorization is limited to this BLE revision. The dance JSON schema and
+TypeScript chart mirror remain frozen. The proposed messages below are not yet
+implemented or part of the current wire contract; the next step is to revise
+the protocol and PRD together, then implement and test the browser output.
 
 ## Proposed player experience
 

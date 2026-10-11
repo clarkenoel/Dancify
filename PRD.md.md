@@ -216,7 +216,10 @@ beat/hit output and firmware are not implemented. The frozen protocol lacks a
 stop command, so it cannot yet express silence during pause/tracking loss/results.
 The [wearable output RFC](docs/handoffs/wearable-output-rfc.md) proposes reusing
 `DIR:DOWN`/`DIR:UP` for rotary navigation and adding an explicit output run state.
-That proposal is pending approval; it does not amend the frozen protocol.
+Revision of `schema/wearable.protocol.md` for that proposal was explicitly
+authorized on 2026-10-11. The BLE document is temporarily unfrozen for this work;
+the new commands remain unimplemented and are not yet the current wire contract.
+The dance chart schema and TypeScript mirror remain frozen.
 
 ---
 

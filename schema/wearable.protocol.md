@@ -1,6 +1,12 @@
 # Wearable Protocol — Dancify
 
-**FROZEN.** Changes require integrator approval and a `[SCHEMA CHANGE]` commit.
+**UNFROZEN FOR THE WEARABLE FEEDBACK REVISION — authorized 2026-10-11.**
+Scope: the rotary mapping, `RUN:0/1`, and beat/hit timing and lifecycle semantics
+proposed in [the wearable output RFC](../docs/handoffs/wearable-output-rfc.md).
+Use a `[SCHEMA CHANGE]` commit for the revision. The messages below remain the
+current contract until that revision is implemented and documented; unfreezing
+alone does not add commands. The dance JSON schema and TypeScript chart mirror
+remain frozen. Re-freeze this protocol once the revision is complete.
 
 ## BLE Service
 
