@@ -157,6 +157,7 @@ def run_pipeline(
         keyframe_indices=key_idxs,
         frame_valid=frame_valid,
     )
+    checkpoint_quality = {"selected": len(hits), "retained": len(moves), "omitted": len(hits) - len(moves)}
     if not moves:
         raise RuntimeError(
             "No usable motion hits found; reject flat, missing, or unstable motion"
@@ -185,6 +186,7 @@ def run_pipeline(
         "chart": str(Path(output_json)),
         "timing": timing.to_report(),
         "tracking": evaluation.to_dict(),
+        "checkpoint_quality": checkpoint_quality,
         "diagnostics": {"tracking": str(tracking_path)},
         "readiness": {
             "cache_ready_by_default": not timing.synthetic,

@@ -38,3 +38,22 @@ it('keeps exact result payload and session key after ambiguous network failure a
   expect(fetcher.mock.calls[0][1].body).toEqual(fetcher.mock.calls[1][1].body);
   expect(restored.list()).toHaveLength(0);
 });
+
+it('explains unreachable service failures for file uploads without retrying them', async () => {
+  const fetcher = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+  const api = new DancifyApi('http://127.0.0.1:8001', fetcher);
+  await expect(api.upload('Dance', new File(['video'], 'dance.mp4', { type: 'video/mp4' })))
+    .rejects.toThrow('Cannot reach the local song service at http://127.0.0.1:8001');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const body = fetcher.mock.calls[0][1].body as FormData;
+  expect(body.get('title')).toBe('Dance');
+  expect((body.get('video') as File).name).toBe('dance.mp4');
+});
+
+it('keeps aborts and HTTP upload errors distinct from connection failures', async () => {
+  const abort = new DOMException('Aborted', 'AbortError');
+  await expect(new DancifyApi('http://api', vi.fn().mockRejectedValue(abort)).listSongs()).rejects.toBe(abort);
+  const fetcher = vi.fn().mockResolvedValue(Response.json({ detail: 'Video is too large' }, { status: 413 }));
+  await expect(new DancifyApi('http://api', fetcher).upload('Dance', new File(['video'], 'dance.mp4')))
+    .rejects.toMatchObject({ status: 413, message: 'Video is too large' });
+});

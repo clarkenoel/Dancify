@@ -154,3 +154,11 @@ Browser automation is optional and needs a separately installed Chromium plus an
 - **Camera denied:** open the application in the Windows browser at localhost, grant permissions, and close other applications holding the camera.
 
 Use Ctrl+C in each server terminal to stop. On subsequent days, start only the API and frontend; installed dependencies and prepared songs remain. Run `npm ci` or pip installation again when their dependency files change.
+
+## Easier everyday startup
+
+The [local launcher](../LAUNCHER.md) now manages both servers together. After the
+prerequisites are installed, use `bash scripts/setup.sh` once, then
+`bash scripts/start.sh` from the repository root. Windows double-click setup and
+startup entry points are described in that guide. Stop the old manual servers
+before switching to the launcher.

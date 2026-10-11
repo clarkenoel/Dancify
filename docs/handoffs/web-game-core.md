@@ -76,3 +76,13 @@ portable setup, browser test commands, module boundaries and session semantics.
   failures continue to offer upload. Credentials stay outside source and chat.
 
 No deployment, publication, push, or schema unfreeze was performed.
+
+## Subsequent planned webcam work (2026-10-10)
+
+The approved [webcam/player-lock plan](../plans/webcam-player-lock.md) adds explicit
+controller/keyboard pairing, multi-person body tracking and session-only local
+face matching to maintain one scored player when spectators enter. It is planned,
+not part of the delivered single-person runtime or the verification above.
+Identity uncertainty pauses playback and scoring; no silent handoff is allowed.
+Face data never enters backend storage, results, logs or persistent browser
+storage. Frozen contracts and the solo-dancer preparation boundary remain intact.

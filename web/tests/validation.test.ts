@@ -21,3 +21,9 @@ it('rejects legacy normalization, synthetic timing and mixed bundle IDs', () => 
   expect(() => validateReport({ ...r, timing: { ...r.timing, synthetic: true } }, chart(), 'song', 'bundle')).toThrow();
   expect(() => validateReport(r, chart(), 'song', 'new-bundle')).toThrow('identity');
 });
+it('accepts truthful omission counts and rejects inconsistent reports', () => {
+  const c = chart(), r = { ...report(), checkpoint_quality: { selected: c.moves.length + 1, retained: c.moves.length, omitted: 1 } };
+  expect(validateReport(r, c, 'song', 'bundle')).toEqual(r);
+  r.checkpoint_quality.omitted = 0;
+  expect(() => validateReport(r, c, 'song', 'bundle')).toThrow('counts');
+});

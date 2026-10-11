@@ -60,3 +60,20 @@ The supported MVP runs Vite and the loopback-only API on the same player
 computer. Configure the frontend API base URL and explicit CORS origin. Camera
 and Web Bluetooth require localhost or HTTPS. Do not expose the unauthenticated
 backend publicly.
+
+## Planned webcam identity gate (not yet implemented)
+
+The [session player-lock plan](../plans/webcam-player-lock.md) adds a browser-only
+identity gate before pose comparison. Pair one player explicitly, then use body
+continuity and session face matching to keep spectator poses out of scoring.
+Identity ambiguity pauses the reference video and scoring and invalidates pending
+inference. A confirmed match may resume the paused run; re-pairing starts a new
+run. Carry session/player generations alongside capture epochs so delayed results
+cannot cross an identity change. Ordinary pose insufficiency still returns null;
+face recognition and controller pairing never award points.
+
+No face images, descriptors or identity fields enter chart bundles, play results,
+API requests or persistent storage. Cropped inference must map landmarks back to
+full-frame coordinates before applying the existing normalization contract.
+These are future implementation requirements, not verified behavior of the
+current single-person camera runtime. Frozen schema and BLE contracts are unchanged.

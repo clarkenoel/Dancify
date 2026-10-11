@@ -5,13 +5,27 @@ export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
+export class ApiConnectionError extends Error {
+  constructor(base: string) {
+    super(`Cannot reach the local song service at ${base}. File uploads also need this service. Check that the backend is running and VITE_DANCIFY_API_URL matches its port, then restart Vite if you changed that setting. Open the app at http://localhost:5173 or http://127.0.0.1:5173; other origins may be blocked by CORS. The browser could not confirm whether the request reached the service; refresh songs before retrying an upload.`);
+    this.name = 'ApiConnectionError';
+  }
+}
+
 export class DancifyApi {
   readonly base: string;
   constructor(base = import.meta.env.VITE_DANCIFY_API_URL || 'http://127.0.0.1:8000', private fetcher: typeof fetch = (...args) => globalThis.fetch(...args)) {
     this.base = base.replace(/\/$/, '');
   }
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const response = await this.fetcher(`${this.base}${path}`, { ...init, cache: 'no-store' });
+    let response: Response;
+    try {
+      response = await this.fetcher(`${this.base}${path}`, { ...init, cache: 'no-store' });
+    } catch (error) {
+      if (init.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
+      if (error instanceof TypeError) throw new ApiConnectionError(this.base);
+      throw error;
+    }
     if (!response.ok) {
       const body = await response.json().catch(() => null);
       const detail = typeof body?.detail === 'string' ? body.detail : `Request failed (${response.status})`;

@@ -10,7 +10,7 @@ current prep MVP accepts short, stable solo CFR clips. Four parts:
 - `/pipeline` — Python prep pipeline (video → `dance.json`)
 - `/backend` — Local FastAPI + SQLite song cache (clips, cached charts, play history; **no auth**)
 - `/web` — TypeScript/React game (plays `dance.json` with webcam scoring)
-- `/firmware` — ESP32 wearable (joystick + piezo, BLE, no scoring contribution)
+- `/firmware` — ESP32 wearable (rotary angle sensor + single button + piezo, BLE, no scoring contribution)
 
 Build order: vision first, hardware later. See `PRD.md.md` §3.
 
@@ -19,7 +19,7 @@ Build order: vision first, hardware later. See `PRD.md.md` §3.
 1. The reference `<video>` element's `currentTime` is the master clock. Not `performance.now()`, not `AudioContext`, and not a separately playing audio element.
 2. Pose comparison returns `null` for insufficient data, never `0`.
 3. Piezo uses LEDC peripheral, never `tone()`.
-4. Joystick ADC pins must be ADC1 (GPIO 32–39). Never ADC2.
+4. If the rotary sensor has analog output, use ADC1-capable pins (GPIO 32–39), never ADC2. Confirm the actual sensor interface before assigning pins.
 5. Keyboard fallback must always work.
 6. The wearable never contributes to the score.
 7. Camera frames never leave the browser.

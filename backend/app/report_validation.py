@@ -54,3 +54,10 @@ def validate_report(report: dict[str, Any], chart: dict[str, Any]) -> None:
     for field in ("longest_invalid_seconds", "trailing_invalid_seconds"):
         value = tracking.get(field)
         require(number(value) and 0 <= value <= 2.000001, f"Invalid tracking gate: {field}")
+
+    if "checkpoint_quality" in report:
+        quality = section("checkpoint_quality")
+        counts = [quality.get(field) for field in ("selected", "retained", "omitted")]
+        require(all(type(value) is int and 0 <= value <= 2**53 - 1 for value in counts), "Invalid checkpoint counts")
+        selected, retained, omitted = counts
+        require(retained == len(chart["moves"]) and selected == retained + omitted, "Checkpoint counts disagree with chart")

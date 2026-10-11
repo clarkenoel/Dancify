@@ -18,6 +18,7 @@ export interface Preparation {
 }
 export interface PreparationOptions { source_kind?: 'url' | 'upload'; start_time?: number; end_time?: number }
 export interface Report {
+  checkpoint_quality?: { selected: number; retained: number; omitted: number };
   version: '1.0';
   normalization: { coordinate_space: 'mediapipe_image'; aspect_ratio: number; x_z_scaled_by_aspect_ratio: true };
   readiness: { cache_ready_by_default: true; synthetic_timing: false; solo_cfr_mvp: true };

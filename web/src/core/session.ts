@@ -1,12 +1,13 @@
 import type { Dance, Judgment, LandmarkTuple, Mode, PlayInput } from './types';
-import { comparePoses } from './pose';
+import { analyzePose } from './pose';
+import { MovementLog, bodyOnly, type SampleDecision } from './movementLog';
 
-export const SCORING_VERSION = 'checkpoint-v1-provisional';
+export const SCORING_VERSION = 'checkpoint-v2-full-body-provisional';
 export const THRESHOLDS = { PERFECT: 0.94, SUPER: 0.85, GOOD: 0.7 };
 const points = { PERFECT: 1000, SUPER: 700, GOOD: 400, MISS: 0, LOST: 0 };
-export interface MoveResult { id: string; judgment: Judgment; similarity: number | null }
+export interface MoveResult { id: string; judgment: Judgment; similarity: number | null; bestSampleTime: number | null; source: Mode }
 export interface SessionSnapshot {
-  mode: Mode; time: number; duration: number; playing: boolean; ended: boolean; epoch: number;
+  sessionId: string; mode: Mode; time: number; duration: number; playing: boolean; ended: boolean; epoch: number;
   score: number; combo: number; maxCombo: number; accuracy: number | null; coverage: number | null;
   results: MoveResult[]; activeId: string | null; upcomingIds: string[]; seeked: boolean;
   judgments: Record<Judgment, number>;
@@ -20,6 +21,8 @@ export function judge(score: number): Judgment {
 
 export class GameSession {
   epoch = 0;
+  readonly movementLog = new MovementLog();
+  private bestTimes = new Map<string, number>();
   private time = 0;
   private playing = false;
   private ended = false;
@@ -35,6 +38,7 @@ export class GameSession {
   pause() { this.playing = false; this.epoch++; }
   reset() {
     this.epoch++; this.time = 0; this.playing = false; this.ended = false; this.seeked = false;
+    this.movementLog.clear(); this.bestTimes.clear();
     this.best.clear(); this.results.clear(); this.skipped.clear(); this.combo = this.maxCombo = 0;
     this.sessionId = crypto.randomUUID();
   }
@@ -47,7 +51,7 @@ export class GameSession {
   private finalize(id: string) {
     const similarity = this.best.get(id) ?? null;
     const judgment: Judgment = similarity === null ? (this.mode === 'camera' ? 'LOST' : 'MISS') : judge(similarity);
-    this.results.set(id, { id, judgment, similarity });
+    this.results.set(id, { id, judgment, similarity, bestSampleTime: this.bestTimes.get(id) ?? null, source: this.mode });
     this.combo = ['PERFECT', 'SUPER', 'GOOD'].includes(judgment) ? this.combo + 1 : 0;
     this.maxCombo = Math.max(this.maxCombo, this.combo);
   }
@@ -59,17 +63,33 @@ export class GameSession {
       if (move.end <= this.time && !this.results.has(move.id) && !this.skipped.has(move.id)) this.finalize(move.id);
     }
   }
-  sample(capturedAt: number, epoch: number, pose: LandmarkTuple[] | null) {
-    if (this.mode !== 'camera' || !this.playing || epoch !== this.epoch || capturedAt > this.time + 0.05) return;
+  sample(capturedAt: number, epoch: number, pose: LandmarkTuple[] | null, metadata?: { raw?: LandmarkTuple[]; inferenceMs?: number }) {
     const move = this.chart.moves.find(m => capturedAt >= m.start && capturedAt < m.end);
-    if (!move || this.results.has(move.id) || this.skipped.has(move.id) || this.time >= move.end) return;
-    const similarity = comparePoses(move.keyframe_landmarks, pose);
-    if (similarity !== null) this.best.set(move.id, Math.max(similarity, this.best.get(move.id) ?? 0));
+    const decision: SampleDecision = { status: 'accepted', checkpointId: move?.id ?? null, comparison: null };
+    if (this.mode !== 'camera') decision.status = 'wrong_mode';
+    else if (!this.playing) decision.status = 'paused';
+    else if (epoch !== this.epoch) decision.status = 'stale_epoch';
+    else if (!Number.isFinite(capturedAt) || capturedAt > this.time + 0.05) decision.status = 'future_sample';
+    else if (!move) decision.status = 'outside_window';
+    else if (this.results.has(move.id) || this.skipped.has(move.id) || this.time >= move.end) decision.status = 'closed_window';
+    else {
+      decision.comparison = analyzePose(move.keyframe_landmarks, pose);
+      const similarity = decision.comparison.similarity;
+      if (similarity === null) decision.status = 'insufficient_pose';
+      else if (!this.best.has(move.id) || similarity > this.best.get(move.id)!) {
+        this.best.set(move.id, similarity); this.bestTimes.set(move.id, capturedAt);
+      }
+    }
+    // Do not retain late frames from a previous run in the new run's log.
+    if (epoch === this.epoch && !this.ended && this.mode === 'camera') {
+      this.movementLog.record(capturedAt, this.time, epoch, pose, decision, metadata?.raw, metadata?.inferenceMs);
+    }
+    return decision;
   }
   keyboardHit() {
     if (this.mode !== 'keyboard_practice' || !this.playing) return;
     const move = this.chart.moves.find(m => this.time >= m.start && this.time < m.end);
-    if (move && !this.skipped.has(move.id) && !this.results.has(move.id)) this.best.set(move.id, 1);
+    if (move && !this.skipped.has(move.id) && !this.results.has(move.id)) { this.best.set(move.id, 1); this.bestTimes.set(move.id, this.time); }
   }
   finish() {
     if (this.ended) return;
@@ -84,7 +104,7 @@ export class GameSession {
       if (r.similarity !== null) { comparable++; sum += r.similarity; }
     }
     return {
-      mode: this.mode, time: this.time, duration: this.chart.duration, playing: this.playing, ended: this.ended, epoch: this.epoch,
+      sessionId: this.sessionId, mode: this.mode, time: this.time, duration: this.chart.duration, playing: this.playing, ended: this.ended, epoch: this.epoch,
       results, judgments, score, combo: this.combo, maxCombo: this.maxCombo,
       // Lost tracking remains LOST, but cannot inflate accuracy by shrinking its denominator.
       accuracy: comparable ? sum / Math.max(1, results.length) : null,
@@ -92,6 +112,16 @@ export class GameSession {
       activeId: this.chart.moves.find(m => this.time >= m.start && this.time < m.end)?.id ?? null,
       upcomingIds: this.chart.moves.filter(m => m.end > this.time).slice(0, 4).map(m => m.id),
       seeked: this.seeked,
+    };
+  }
+  diagnostics(bundleId: string) {
+    return { version: 'movement-log-v1', bundleId, sessionId: this.sessionId, mode: this.mode,
+      scoringVersion: SCORING_VERSION, thresholds: THRESHOLDS, snapshot: this.snapshot(),
+      recording: this.movementLog.enabled, droppedSamples: this.movementLog.dropped,
+      coordinates: 'Image body: unmirrored normalized image coordinates. Normalized body: aspect-corrected, hip-centered, torso-scaled. Only joints 11–16 and 23–28; no face or video.',
+      movementDelta: 'Mean normalized 3D joint displacement between consecutive comparable captures within 0.5s and the same epoch. Not a score or calibrated activity threshold.',
+      targets: this.chart.moves.map(m => ({ id: m.id, start: m.start, end: m.end, body: bodyOnly(m.keyframe_landmarks) })),
+      samples: this.movementLog.list(),
     };
   }
   result(bundleId: string, playerName: string): PlayInput {

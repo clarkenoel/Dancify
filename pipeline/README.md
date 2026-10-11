@@ -14,6 +14,15 @@ targets. Multi-person isolation, angular-velocity energy, and hold merging are
 explicitly deferred; current energy is confidence-masked normalized landmark
 speed and every move has `is_hold=false`.
 
+Serialized checkpoints must pass the browser scoring contract: all twelve
+gameplay joints at visibility >= 0.35 with usable torso and limb geometry.
+This target requirement is separate from the existing frame-continuity gate.
+Shared acceptance examples live in `fixtures/scorable-targets.json`; Python,
+backend and browser tests must agree on them.
+Unscorable selected checkpoints are omitted, without substituting other poses.
+The report's `checkpoint_quality` records selected, retained and omitted counts;
+the game displays omissions. Preparation fails if no usable checkpoints remain.
+
 ## Setup
 
 ```bash

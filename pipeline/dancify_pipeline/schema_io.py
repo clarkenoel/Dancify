@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 from jsonschema import Draft7Validator
 
-from .tracking import usable_keyframe
+from .scoring_contract import scorable_pose
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_CANDIDATES = (
@@ -74,8 +74,8 @@ def validate_dance_semantics(doc: dict[str, Any]) -> None:
         if move["is_hold"] is not False:
             raise ValueError(f"moves/{index}/is_hold=true is not supported")
         keyframe = np.asarray(move["keyframe_landmarks"], dtype=np.float64)
-        if not usable_keyframe(keyframe):
-            raise ValueError(f"moves/{index} has no usable visible keyframe")
+        if not scorable_pose(keyframe):
+            raise ValueError(f"moves/{index} has no usable visible full-body keyframe (12 joints and noncollapsed geometry required)")
 
 
 def validate_dance(doc: dict[str, Any]) -> None:

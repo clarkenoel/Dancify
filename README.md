@@ -44,3 +44,9 @@ Firmware: not yet scaffolded in this repository.
 - `pipeline/README.md` — shipped prep MVP and supported inputs
 - `pipeline/WEB_HANDOFF.md` — complete video/chart/audio browser handoff
 - `schema/` — frozen contracts
+
+## One-window local startup
+
+Use the [Windows/WSL2 launcher](LAUNCHER.md) to start both services and open the
+browser. After prerequisites are installed, run `bash scripts/setup.sh` once and
+`bash scripts/start.sh` for daily use, or use the Windows double-click entry points.

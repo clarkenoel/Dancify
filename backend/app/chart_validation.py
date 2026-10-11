@@ -8,11 +8,7 @@ from typing import Any
 from jsonschema import Draft7Validator
 
 from .paths import CHART_SCHEMA_PATH
-
-VISIBILITY_THRESHOLD = 0.35
-MIN_VISIBLE_JOINTS = 6
-NONZERO_TOLERANCE = 1e-8
-SCORE_LANDMARK_INDEXES = (11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28)
+from .scoring_contract import scorable_pose
 
 
 class ChartValidationError(ValueError):
@@ -120,26 +116,10 @@ def validate_chart(raw: bytes) -> dict[str, Any]:
                     f"[{landmark_index}][3] must be between zero and one"
                 )
 
-        visible_indexes = [
-            index
-            for index in SCORE_LANDMARK_INDEXES
-            if float(move["keyframe_landmarks"][index][3]) >= VISIBILITY_THRESHOLD
-        ]
-        if len(visible_indexes) < MIN_VISIBLE_JOINTS:
+        if not scorable_pose(move["keyframe_landmarks"]):
             raise ChartValidationError(
-                f"moves[{move_index}] needs at least {MIN_VISIBLE_JOINTS} "
-                f"gameplay joints with visibility >= {VISIBILITY_THRESHOLD}"
-            )
-        visible_geometry = (
-            move["keyframe_landmarks"][index][:3] for index in visible_indexes
-        )
-        if all(
-            abs(float(coordinate)) <= NONZERO_TOLERANCE
-            for landmark in visible_geometry
-            for coordinate in landmark
-        ):
-            raise ChartValidationError(
-                f"moves[{move_index}] has no usable nonzero visible pose geometry"
+                f"moves[{move_index}] needs all 12 visible gameplay joints and "
+                "usable torso/limb geometry. Prepare the song again with a clearer clip."
             )
 
     return payload
