@@ -96,7 +96,9 @@ test('round ends with an immediate score and navigation even when history fails'
 });
 
 test('official local model renders the dancer skeleton, switches cameras and cleans up', async ({ browser, request }) => {
-  test.setTimeout(150000);
+  // Several independently bounded model startups plus recovery can exceed 150s on CI.
+  // Per-operation assertions and the production 2.5s watchdog remain unchanged.
+  test.setTimeout(240000);
   // A real media fixture through getUserMedia, not mocked landmarks or a physical camera.
   const context = await browser.newContext({ permissions: ['camera'] });
   const page = await context.newPage();
@@ -169,6 +171,16 @@ test('official local model renders the dancer skeleton, switches cameras and cle
   expect(narrowCamera!.y).toBeGreaterThan(narrowReference!.y + narrowReference!.height);
   expect(narrowCamera!.x + narrowCamera!.width).toBeLessThanOrEqual(390);
   await page.setViewportSize({ width: 1280, height: 720 });
+
+  // Software-rendered CI can hit the production inference watchdog while resizing.
+  // Verify its recovery contract before beginning the separate injected-stall test.
+  if (await page.getByRole('button', { name: 'Enable camera', exact: true }).count()) {
+    await expect(page.getByRole('alert')).toContainText('stopped responding');
+    expect(await page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+    await expect.poll(() => skeleton.evaluate((c: HTMLCanvasElement) => c.width)).toBe(0);
+    await page.getByRole('button', { name: 'Enable camera', exact: true }).click();
+    await expect(page.getByLabel('Body tracking status')).toContainText(/Ready|Tracking body/, { timeout: 40000 });
+  }
 
   await page.getByRole('checkbox', { name: 'Show body skeleton' }).uncheck();
   await expect(page.getByRole('checkbox', { name: 'Show body skeleton' })).not.toBeChecked();

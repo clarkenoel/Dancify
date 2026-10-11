@@ -85,3 +85,19 @@ physical webcam recovery, Bluetooth reliability or scoring calibration.
 
 Record any failure with song/bundle, mode and video time. Simulator commands stay
 in memory (last 200); they are not physical piezo or scoring-accuracy measurements.
+
+## Illustrated targets
+
+- Open a ready song: Lenny should appear in the timing overlay and upcoming targets;
+  Camera scoring uses the same artwork beside the webcam.
+- Switch **Target character** to Human: it should have blue fill/dark outlines.
+  Switch back to Lenny: it should have green skin and cream scutes/horns.
+- Pause, note the video time/score, then toggle **Show target skeleton instead of
+  artwork** twice. Video time, score and camera state must remain unchanged.
+- Review an asymmetric pose: its raised arm must stay on the same screen side as
+  the original chart skeleton. The webcam itself remains mirrored.
+- Play a camera round, see immediate results, replay through countdown, and switch
+  songs. Watch for missing parts, clipped hands/feet and overlapping limbs.
+- Ask the designer to review `/debug/pictograms.html` on the local Vite server.
+  Upload the demo's prepared `dance.json` to compare artwork and skeleton for each
+  checkpoint. This gallery is diagnostic and produces no scores.

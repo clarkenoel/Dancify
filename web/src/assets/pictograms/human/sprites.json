@@ -1,0 +1,198 @@
+{
+  "body": {
+    "crop": [
+      1408,
+      775,
+      2065,
+      1948
+    ],
+    "size": [
+      143,
+      256
+    ],
+    "source": "human/human_body 1.png",
+    "sourceSha256": "169baecbe64fc17fe27a236a1da818385f611f51ddc0205b522b8af00217b260"
+  },
+  "head": {
+    "crop": [
+      1490,
+      249,
+      1977,
+      731
+    ],
+    "size": [
+      256,
+      253
+    ],
+    "source": "human/human_face 1.png",
+    "sourceSha256": "64be3e2e979e0197f68efb02b9507de830bc3daf085bff9fcdcfacf53af0fb95"
+  },
+  "leftUpperArm": {
+    "crop": [
+      1152,
+      770,
+      1517,
+      1451
+    ],
+    "size": [
+      137,
+      256
+    ],
+    "source": "human/human_arms 1.png",
+    "sourceSha256": "fee6468b4140d87992753275c28455dd2c890a71760597eb436054c9296d2866"
+  },
+  "leftForearm": {
+    "crop": [
+      1150,
+      1406,
+      1383,
+      1859
+    ],
+    "size": [
+      132,
+      256
+    ],
+    "source": "human/human_lowerarms 1.png",
+    "sourceSha256": "73c555db9ee111e9e84facdaa59ad34eead2528766a4ffb90054f0ba0cda2961"
+  },
+  "leftHand": {
+    "crop": [
+      1157,
+      1816,
+      1378,
+      1952
+    ],
+    "size": [
+      221,
+      136
+    ],
+    "source": "human/human_hands 1.png",
+    "sourceSha256": "199e4403bec8a99a364e792294d768d953d0b872f150bdd1c09663d45cc2448c"
+  },
+  "leftUpperLeg": {
+    "crop": [
+      1398,
+      1883,
+      1732,
+      2452
+    ],
+    "size": [
+      150,
+      256
+    ],
+    "source": "human/human_knees 1.png",
+    "sourceSha256": "4f3addce97ac3834dfad4a5b694d56d874a93f030bff7b3bd5d4fe66326bf164"
+  },
+  "leftLowerLeg": {
+    "crop": [
+      1398,
+      2399,
+      1728,
+      3057
+    ],
+    "size": [
+      128,
+      256
+    ],
+    "source": "human/human_lowerlegs 1.png",
+    "sourceSha256": "f4c7d83ddf3cf0bfac30e9a6e3e2cc909fe6acf8381137eb9dbad66bdc2b3027"
+  },
+  "leftFoot": {
+    "crop": [
+      1395,
+      3007,
+      1732,
+      3174
+    ],
+    "size": [
+      256,
+      127
+    ],
+    "source": "human/human_feet 1.png",
+    "sourceSha256": "606320079d65d441727f5c8e345a559629ed85bc6d73d91090ffd8a13ffc6bb3"
+  },
+  "rightUpperArm": {
+    "crop": [
+      1949,
+      787,
+      2331,
+      1476
+    ],
+    "size": [
+      142,
+      256
+    ],
+    "source": "human/human_arms 1.png",
+    "sourceSha256": "fee6468b4140d87992753275c28455dd2c890a71760597eb436054c9296d2866"
+  },
+  "rightForearm": {
+    "crop": [
+      2079,
+      1424,
+      2326,
+      1841
+    ],
+    "size": [
+      152,
+      256
+    ],
+    "source": "human/human_lowerarms 1.png",
+    "sourceSha256": "73c555db9ee111e9e84facdaa59ad34eead2528766a4ffb90054f0ba0cda2961"
+  },
+  "rightHand": {
+    "crop": [
+      2084,
+      1795,
+      2325,
+      1948
+    ],
+    "size": [
+      241,
+      153
+    ],
+    "source": "human/human_hands 1.png",
+    "sourceSha256": "199e4403bec8a99a364e792294d768d953d0b872f150bdd1c09663d45cc2448c"
+  },
+  "rightUpperLeg": {
+    "crop": [
+      1732,
+      1914,
+      2063,
+      2489
+    ],
+    "size": [
+      147,
+      256
+    ],
+    "source": "human/human_knees 1.png",
+    "sourceSha256": "4f3addce97ac3834dfad4a5b694d56d874a93f030bff7b3bd5d4fe66326bf164"
+  },
+  "rightLowerLeg": {
+    "crop": [
+      1740,
+      2421,
+      2058,
+      3064
+    ],
+    "size": [
+      127,
+      256
+    ],
+    "source": "human/human_lowerlegs 1.png",
+    "sourceSha256": "f4c7d83ddf3cf0bfac30e9a6e3e2cc909fe6acf8381137eb9dbad66bdc2b3027"
+  },
+  "rightFoot": {
+    "crop": [
+      1732,
+      3025,
+      2058,
+      3177
+    ],
+    "size": [
+      256,
+      119
+    ],
+    "source": "human/human_feet 1.png",
+    "sourceSha256": "606320079d65d441727f5c8e345a559629ed85bc6d73d91090ffd8a13ffc6bb3"
+  }
+}

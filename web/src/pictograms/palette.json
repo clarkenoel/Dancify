@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "lenny": {
+    "base": "#69A958",
+    "shade": "#4E8B49",
+    "outline": "#1D2E27",
+    "cream": "#F5F0C5",
+    "creamShade": "#E7DBA2",
+    "eye": "#704735",
+    "stem": "#93484B",
+    "stemShade": "#693338",
+    "flower": "#E6AEA9",
+    "flowerHighlight": "#F4DBCC"
+  },
+  "human": {
+    "base": "#438FDC",
+    "shade": "#3374BD",
+    "outline": "#182D49"
+  }
+}

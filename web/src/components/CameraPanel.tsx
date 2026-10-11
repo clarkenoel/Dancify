@@ -1,8 +1,9 @@
+import type { Character } from '../pictograms/rig';
 import type { Move } from '../core/types';
 import type { useCamera } from '../hooks/useCamera';
 import { PoseTarget } from './PoseTarget';
 
-export function CameraPanel({ camera, target, active }: { camera: ReturnType<typeof useCamera>; target?: Move; active: boolean }) {
+export function CameraPanel({ camera, target, active, showTargetSkeleton = false, character = 'lenny' }: { camera: ReturnType<typeof useCamera>; target?: Move; active: boolean; showTargetSkeleton?: boolean; character?: Character }) {
   const missingDevice = camera.deviceId && !camera.devices.some(d => d.deviceId === camera.deviceId);
   return <section aria-label="Player camera" style={{ minWidth: 0 }}>
     <h3>Your camera</h3>
@@ -32,7 +33,7 @@ export function CameraPanel({ camera, target, active }: { camera: ReturnType<typ
     {camera.deviceError && <p role="alert">{camera.deviceError}</p>}
     <div aria-label="Camera target pose">
       <h4>{active ? 'Match this target' : 'Next target'}</h4>
-      {target ? <PoseTarget move={target} /> : <p>No more target poses.</p>}
+      {target ? <PoseTarget move={target} showSkeleton={showTargetSkeleton} character={character} /> : <p>No more target poses.</p>}
     </div>
     <p>Your camera frames stay in this browser. “Ready” describes visibility; it does not confirm player identity or a correct dance pose.</p>
   </section>;
