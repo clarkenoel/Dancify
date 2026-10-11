@@ -1,4 +1,5 @@
 import type { Page, TestInfo } from '@playwright/test';
+import { writeFile } from 'node:fs/promises';
 
 /** Test-only timing evidence: no images, landmarks, app state or deadlines change. */
 export async function recordCameraDiagnostics(page: Page) {
@@ -61,6 +62,10 @@ export async function recordCameraDiagnostics(page: Page) {
       new Promise(resolve => { timer = setTimeout(() => resolve({ captureError: 'Renderer did not answer within 5 seconds' }), 5000); }),
     ]);
     if (timer) clearTimeout(timer);
-    await info.attach('camera-timing-diagnostics', { body: Buffer.from(JSON.stringify({ browserState, messages }, null, 2)), contentType: 'application/json' });
+    // CI uploads test-results, so persist the file as well as attaching it.
+    // Body-only attachments are retained by reporters, not written to that folder.
+    const diagnosticPath = info.outputPath('camera-timing-diagnostics.json');
+    await writeFile(diagnosticPath, JSON.stringify({ browserState, messages }, null, 2));
+    await info.attach('camera-timing-diagnostics', { path: diagnosticPath, contentType: 'application/json' });
   };
 }
