@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dance pictogram joint rig</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f2eee6;color:#202b27;font:16px system-ui,sans-serif}main{max-width:1160px;margin:auto;padding:24px}h1{font-size:28px;margin:0 0 8px}p{line-height:1.5}.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px}.stage{background:#fffdf8;border-radius:16px;padding:12px}canvas{display:block;width:100%;height:auto}.controls{display:grid;gap:16px;align-content:start}label{display:grid;gap:6px}select,input,button{font:inherit}select,input[type=number],button{padding:8px;border:1px solid #aca99e;border-radius:6px;background:#fff}input[type=range]{width:100%}.coordinates{display:grid;grid-template-columns:1fr 1fr;gap:8px}button{cursor:pointer}output{font-variant-numeric:tabular-nums}.small{font-size:14px;color:#536057}#status{min-height:24px}details img{max-width:300px;width:100%}@media(max-width:760px){.layout{grid-template-columns:1fr}.controls{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}}
+</style>
+<main>
+<h1>Dance pictogram joint rig</h1>
+<p>Rotate a joint to see its child parts follow. Switch the hand pose or Lenny’s viewing profile without changing the hierarchy.</p>
+<div class="layout">
+<div class="stage"><canvas id="stage" width="1100" height="720" aria-label="Human and Lenny characters with independently articulated limbs"></canvas><p id="status" role="status"></p></div>
+<div class="controls">
+<label>Character<select id="character"><option value="human">Human</option><option value="lenny">Lenny</option></select></label>
+<label>Joint<select id="bone"></select></label>
+<label>Local rotation <output id="degrees">0°</output><input id="angle" type="range" min="-160" max="160" value="0" step="1"></label>
+<label>Hand pose<select id="hand"><option value="open">Open hands</option><option value="fist">Fists</option><option value="point">Pointed</option></select></label>
+<label>Lenny profile<select id="profile"><option value="front">Front</option><option value="side">Side</option><option value="back">Back torso</option></select></label>
+<label><span><input id="markers" type="checkbox" checked> Show joint pivots</span></label>
+<div class="wide"><span>Selected sprite pivot (source pixels)</span><div class="coordinates"><label>X<input id="pivotX" type="number" min="0" max="3464" step="1"></label><label>Y<input id="pivotY" type="number" min="0" max="3464" step="1"></label></div><p class="small" id="pivotInfo"></p></div>
+<button id="reset">Reset pose</button><button id="download">Download calibrated rig</button>
+</div></div>
+<details><summary>Original gameplay reference</summary><p>This is the supplied static reference. The articulated characters above are rendered live from the original transparent parts.</p><img src="gameplay-example.png" alt="Original gameplay template with Lenny overlaid at the lower right"></details>
+<p class="small">Left and right refer to the viewer’s sides. Pivot edits remain in this page until downloaded. No game clock, scoring, camera, or video playback is attached to this demonstration.</p>
+</main>
+<script type="module">
+import {drawRig,loadRigImages} from '../../assets/pictograms/rig.mjs';
+const $=id=>document.getElementById(id);
+const stage=$('stage'), ctx=stage.getContext('2d');
+const state={human:{angles:{},hand:'open',profile:'front'},lenny:{angles:{},hand:'open',profile:'front'}};
+let rig,images;
+const current=()=>state[$('character').value];
+function variants(character){const s=state[character];return {body:s.profile,head:s.profile==='side'?'side':'front',leftHand:s.hand,rightHand:s.hand};}
+function selectedSprite(){const c=$('character').value;const b=rig.characters[c].bones.find(b=>b.id===$('bone').value);const v=variants(c)[b.id]??Object.keys(b.variants)[0];return b.variants[v];}
+function refreshControls(){
+ const s=current();$('angle').value=(s.angles[$('bone').value]??0)*180/Math.PI;$('degrees').value=Math.round(Number($('angle').value))+'°';$('hand').value=s.hand;$('profile').value=s.profile;$('profile').disabled=$('character').value==='human';
+ const sprite=selectedSprite();$('pivotX').value=sprite.pivot[0];$('pivotY').value=sprite.pivot[1];$('pivotInfo').textContent=`Normalized: ${sprite.pivot.map(v=>(v/3464).toFixed(4)).join(', ')} · Layer center: 1732, 1732`;
+}
+function draw(){
+ ctx.clearRect(0,0,stage.width,stage.height);ctx.fillStyle='#fffdf8';ctx.fillRect(0,0,stage.width,stage.height);
+ ctx.font='20px system-ui';ctx.fillStyle='#202b27';ctx.fillText('Human',270,40);ctx.fillText('Lenny',790,40);
+ const poses={};
+ for(const [character,x] of [['human',300],['lenny',820]]){
+   const s=state[character]; poses[character]=drawRig(ctx,rig,images,character,{angles:s.angles,variants:variants(character),origin:[x,character==='human'?390:510],scale:character==='human'?.17:.16,showJoints:$('markers').checked});
+ }
+ const pose=poses[$('character').value].get($('bone').value);
+ if(pose){ctx.strokeStyle='#c55624';ctx.lineWidth=2;ctx.beginPath();ctx.arc(...pose.joint,9,0,Math.PI*2);ctx.stroke();}
+ $('status').textContent=`${$('character').selectedOptions[0].text} · ${$('bone').value} · ${$('degrees').value}`;
+ window.rigDemo={rig,state,poses,draw};
+}
+function populate(){const old=$('bone').value;$('bone').replaceChildren(...rig.characters[$('character').value].bones.map(b=>new Option(b.id,b.id)));$('bone').value=old||'leftUpperArm';refreshControls();draw();}
+try{
+ const response=await fetch('../../assets/pictograms/rig.json');if(!response.ok)throw new Error('Could not load rig.json');rig=await response.json();images=await loadRigImages(rig,new URL('../../assets/pictograms/',location.href));
+ $('character').onchange=populate;$('bone').onchange=()=>{refreshControls();draw();};
+ $('angle').oninput=()=>{current().angles[$('bone').value]=Number($('angle').value)*Math.PI/180;refreshControls();draw();};
+ $('hand').onchange=()=>{current().hand=$('hand').value;refreshControls();draw();};
+ $('profile').onchange=()=>{current().profile=$('profile').value;refreshControls();draw();};$('markers').onchange=draw;
+ for(const [id,index] of [['pivotX',0],['pivotY',1]])$(id).onchange=()=>{const v=Number($(id).value);if(!Number.isFinite(v)||v<0||v>3464){refreshControls();return;}const sprite=selectedSprite();sprite.pivot[index]=v;sprite.pivotNormalized=sprite.pivot.map(x=>x/3464);refreshControls();draw();};
+ $('reset').onclick=()=>{current().angles={};refreshControls();draw();};
+ $('download').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(rig,null,2)+'\n'],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='rig.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+ populate();
+}catch(error){$('status').textContent=error.message+' — serve the repository over HTTP as described in the README.';console.error(error);}
+</script>
+</html>
