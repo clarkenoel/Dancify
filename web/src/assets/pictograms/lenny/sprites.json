@@ -1,0 +1,198 @@
+{
+  "body": {
+    "crop": [
+      1148,
+      1764,
+      2213,
+      2836
+    ],
+    "size": [
+      254,
+      256
+    ],
+    "source": "lenny/lenny_body 1.png",
+    "sourceSha256": "a4eb93cea26975f2df373ddf9639e4bac0549d22f7df8b9d61a3647923b56f12"
+  },
+  "head": {
+    "crop": [
+      1061,
+      884,
+      2287,
+      1841
+    ],
+    "size": [
+      256,
+      200
+    ],
+    "source": "lenny/lenny_face 1.png",
+    "sourceSha256": "bcb118206ab2455d05ccf51fbc125672c6ea35418302121fc9379cc5f847d18b"
+  },
+  "leftUpperArm": {
+    "crop": [
+      781,
+      1735,
+      1481,
+      2194
+    ],
+    "size": [
+      256,
+      168
+    ],
+    "source": "lenny/lenny_upperarm 1.png",
+    "sourceSha256": "06ce41aee9bcc8c9c7a3e56e53afc1e3d59f3a27828d129c04b837a5ea879eee"
+  },
+  "leftForearm": {
+    "crop": [
+      553,
+      1882,
+      1206,
+      2383
+    ],
+    "size": [
+      256,
+      196
+    ],
+    "source": "lenny/lenny_arms 1.png",
+    "sourceSha256": "27e47eb27804edbf10d4521762cadc2c237e78a2bee9b6fa287f68ab74f5aaaa"
+  },
+  "leftHand": {
+    "crop": [
+      530,
+      1951,
+      777,
+      2354
+    ],
+    "size": [
+      157,
+      256
+    ],
+    "source": "lenny/lenny_hands 1.png",
+    "sourceSha256": "5fac917cccd421f3328192ccc1686ff9d22027e538c46964b7ceb99a1f77a1ff"
+  },
+  "leftUpperLeg": {
+    "crop": [
+      1067,
+      2733,
+      1581,
+      3110
+    ],
+    "size": [
+      256,
+      188
+    ],
+    "source": "lenny/lenny_knees 1.png",
+    "sourceSha256": "44e63ae31b0150b7f66ab531ca95ad926058652de0c064011734ab9f97d580d2"
+  },
+  "leftLowerLeg": {
+    "crop": [
+      1014,
+      2938,
+      1484,
+      3340
+    ],
+    "size": [
+      256,
+      219
+    ],
+    "source": "lenny/lenny_lowerlegs 1.png",
+    "sourceSha256": "f974973415cc21d2a88bd1a4c04ff569800ed7a09f0b667654e43b2a910c4fb4"
+  },
+  "leftFoot": {
+    "crop": [
+      1012,
+      3122,
+      1422,
+      3357
+    ],
+    "size": [
+      256,
+      147
+    ],
+    "source": "lenny/lenny_feet 1.png",
+    "sourceSha256": "3230b5a959432da66b68f9702d4caca3d79c6b0842d8cbb7b02b0726b6f6f898"
+  },
+  "rightUpperArm": {
+    "crop": [
+      1854,
+      1738,
+      2555,
+      2196
+    ],
+    "size": [
+      256,
+      167
+    ],
+    "source": "lenny/lenny_upperarm 1.png",
+    "sourceSha256": "06ce41aee9bcc8c9c7a3e56e53afc1e3d59f3a27828d129c04b837a5ea879eee"
+  },
+  "rightForearm": {
+    "crop": [
+      2161,
+      1880,
+      2786,
+      2365
+    ],
+    "size": [
+      256,
+      199
+    ],
+    "source": "lenny/lenny_arms 1.png",
+    "sourceSha256": "27e47eb27804edbf10d4521762cadc2c237e78a2bee9b6fa287f68ab74f5aaaa"
+  },
+  "rightHand": {
+    "crop": [
+      2546,
+      1925,
+      2821,
+      2350
+    ],
+    "size": [
+      166,
+      256
+    ],
+    "source": "lenny/lenny_hands 1.png",
+    "sourceSha256": "5fac917cccd421f3328192ccc1686ff9d22027e538c46964b7ceb99a1f77a1ff"
+  },
+  "rightUpperLeg": {
+    "crop": [
+      1753,
+      2685,
+      2288,
+      3093
+    ],
+    "size": [
+      256,
+      195
+    ],
+    "source": "lenny/lenny_knees 1.png",
+    "sourceSha256": "44e63ae31b0150b7f66ab531ca95ad926058652de0c064011734ab9f97d580d2"
+  },
+  "rightLowerLeg": {
+    "crop": [
+      1844,
+      2891,
+      2357,
+      3315
+    ],
+    "size": [
+      256,
+      212
+    ],
+    "source": "lenny/lenny_lowerlegs 1.png",
+    "sourceSha256": "f974973415cc21d2a88bd1a4c04ff569800ed7a09f0b667654e43b2a910c4fb4"
+  },
+  "rightFoot": {
+    "crop": [
+      1943,
+      3139,
+      2337,
+      3340
+    ],
+    "size": [
+      256,
+      131
+    ],
+    "source": "lenny/lenny_feet 1.png",
+    "sourceSha256": "3230b5a959432da66b68f9702d4caca3d79c6b0842d8cbb7b02b0726b6f6f898"
+  }
+}

@@ -375,3 +375,44 @@ No audible latency/drift guarantee has been verified; see the
 Regression commands: `npm test`, `npm run build`, then from the repository root
 run `python3 -m unittest discover -s scripts/tests -v` and the documented
 `web/scripts/test-integration.sh` with a shared installed Playwright browser path.
+
+### Illustrated target poses
+
+Prepared songs show **Lenny** or **Human** in the timing overlay, camera target and
+upcoming checkpoint list. Use **Target character** to switch without restarting. **Show target skeleton instead of artwork** switches all targets
+for comparison without restarting the video/session. Artwork loading/failure and
+unusable projected geometry retain the skeleton display; scores use the original
+chart landmarks in either presentation.
+
+The diagnostic page at `/debug/pictograms.html` on the Vite development server
+shows five explicitly labeled test poses. Load a prepared `dance.json` there to
+compare every real checkpoint against its skeleton. This page does not play or
+score a round and is not included in the production build.
+
+Source art, rig and alternatives for Human and Lenny are preserved under
+`assets/pictograms/`. Both characters use front/open-hand sprites in gameplay.
+Lenny has green skin, cream scutes/horns and dark green outlines from the supplied
+reference. Human has blue fills and dark navy outlines. The colors are baked into
+the checked-in runtime PNGs; palette definitions live in `src/pictograms/palette.json`.
+The original author used viewer-relative side labels; the adapter explicitly
+maps those to MediaPipe's anatomical indices without mirroring chart coordinates.
+The artwork has no inferred finger gestures, facial expressions or profile changes.
+
+Small runtime PNGs are checked in, so normal setup needs no extra generation step.
+After approved source-art changes, regenerate from the repository root with:
+
+```sh
+node web/scripts/bake-pictogram-colors.mjs
+npm test --prefix web
+npm run build --prefix web
+node --test assets/pictograms/rig.test.mjs
+```
+
+The bake command first runs the crop generator with Pillow already installed in
+the pipeline, then uses the installed Chromium to render the palette fills. Set
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE` if Chromium is not at `/usr/bin/chromium`. It
+crops each side inside the authored clip region and resizes to at most 256 pixels. It leaves
+source images/pivots unchanged and records source hashes/crop coordinates.
+See [the pictogram handoff](../docs/handoffs/pictogram-integration.md) for scope,
+review steps and remaining designer decisions. The Figma screen redesign is
+separate from this renderer integration.

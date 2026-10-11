@@ -1,3 +1,4 @@
+import type { Character } from '../pictograms/rig';
 import { useEffect, useRef, useState } from 'react';
 import type { Bundle, Mode } from '../core/types';
 import { useGame } from '../hooks/useGame';
@@ -11,6 +12,8 @@ export function GamePanel({ bundle, mode, wearable, outbox, onResult, onChooseSo
   const game = useGame(bundle, mode, wearable);
   const s = game.snapshot;
   const [showTiming, setShowTiming] = useState(true);
+  const [showTargetSkeleton, setShowTargetSkeleton] = useState(false);
+  const [character, setCharacter] = useState<Character>('lenny');
   const recorded = useRef<string | null>(null);
   const resultsRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -53,14 +56,14 @@ export function GamePanel({ bundle, mode, wearable, outbox, onResult, onChooseSo
         {game.countdown !== null && <h2 role="status" aria-label="Replay countdown">Get ready — {game.countdown}</h2>}
         <div style={{ position: 'relative', width: '100%' }}>
           <video ref={game.videoRef} src={bundle.videoUrl} controls={mode !== 'camera'} playsInline preload="metadata" width="640" style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', objectFit: 'contain' }} aria-label="Reference video" />
-          {showTiming && <TimingOverlay chart={bundle.chart} snapshot={s} mode={mode} />}
+          {showTiming && <TimingOverlay chart={bundle.chart} snapshot={s} mode={mode} showTargetSkeleton={showTargetSkeleton} character={character} />}
         </div>
         <label><input type="checkbox" checked={showTiming} onChange={e => setShowTiming(e.target.checked)} /> Show timing overlay</label>
         <p><button data-controller disabled={mode === 'camera' && !s.playing && game.countdown === null && !game.ready} onClick={() => void game.toggle()}>{game.countdown !== null ? 'Cancel countdown' : mode === 'camera' ? (s.playing ? 'Pause round' : 'Ready — start / resume') : 'Play / pause'}</button>{' '}<button data-controller disabled={game.countdown !== null} onClick={replay}>Replay round</button></p>
         {game.error && <p role="alert">{game.error}</p>}
         <p>Diamonds mark detected music beats. Pose bars mark scoring windows; press Enter during a bar in keyboard practice. Arrow keys still seek. Use this view to check the chart against the music; it does not prove beat detection is correct. Native video fullscreen hides the overlay.</p>
       </section>
-      {mode === 'camera' && <CameraPanel camera={game.camera} target={bundle.chart.moves.find(m => m.id === (s.activeId ?? s.upcomingIds[0]))} active={s.activeId !== null} />}
+      {mode === 'camera' && <CameraPanel camera={game.camera} target={bundle.chart.moves.find(m => m.id === (s.activeId ?? s.upcomingIds[0]))} active={s.activeId !== null} showTargetSkeleton={showTargetSkeleton} character={character} />}
     </div>
     {mode === 'keyboard_practice' && <p><button onClick={game.hit} disabled={!s.playing}>Hit checkpoint</button> Press Enter during a checkpoint window, or use this button.</p>}
     <p>Space: play/pause. R: replay. Left/right arrows: seek for practice. Form controls keep their normal keyboard behavior.</p>
@@ -86,8 +89,10 @@ export function GamePanel({ bundle, mode, wearable, outbox, onResult, onChooseSo
       <button onClick={() => game.wearable.simulate({ type: 'navigate', direction: 'down' })}>Wearable next item</button>
       <p>Wearable events control navigation and playback only. They never score a checkpoint.</p>
     </details>
+    <label>Target character <select value={character} onChange={e => setCharacter(e.target.value as Character)}><option value="lenny">Lenny</option><option value="human">Human</option></select></label>{' '}
+    <label><input type="checkbox" checked={showTargetSkeleton} onChange={e => setShowTargetSkeleton(e.target.checked)} /> Show target skeleton instead of artwork</label>
     <section aria-label="Upcoming checkpoints"><h3>Upcoming checkpoints</h3>
-      {s.upcomingIds.map(id => <PoseTarget key={id} move={bundle.chart.moves.find(m => m.id === id)!} />)}
+      {s.upcomingIds.map(id => <PoseTarget key={id} move={bundle.chart.moves.find(m => m.id === id)!} showSkeleton={showTargetSkeleton} character={character} />)}
     </section></div>
 
   </section>;

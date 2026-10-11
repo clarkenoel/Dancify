@@ -1,0 +1,980 @@
+{
+  "version": 1,
+  "canvasSize": [
+    3464,
+    3464
+  ],
+  "layerCenter": [
+    1732,
+    1732
+  ],
+  "coordinateSystem": "Full source PNG pixels; top-left origin, x right, y down. Left/right are viewer-relative.",
+  "calibration": "Newly authored from source artwork, not recovered Figma rig metadata. Neutral pose and attachment invariants verified; motion aesthetics should be reviewed by the artist.",
+  "aliases": {
+    "human_fist": "human_fists",
+    "human_pointed": "human_pointed",
+    "lenny_pointed": "lenny_point",
+    "lenny_fists": "lenny_fists"
+  },
+  "characters": {
+    "human": {
+      "root": [
+        1732,
+        1920
+      ],
+      "bones": [
+        {
+          "id": "body",
+          "parent": null,
+          "attachment": [
+            1732,
+            1920
+          ],
+          "variants": {
+            "front": {
+              "file": "human/human_body 1.png",
+              "pivot": [
+                1732,
+                1920
+              ],
+              "pivotNormalized": [
+                0.5,
+                0.5542725173210161
+              ],
+              "region": [
+                0,
+                0,
+                3464,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "head",
+          "parent": "body",
+          "attachment": [
+            1732,
+            775
+          ],
+          "variants": {
+            "front": {
+              "file": "human/human_face 1.png",
+              "pivot": [
+                1732,
+                730
+              ],
+              "pivotNormalized": [
+                0.5,
+                0.2107390300230947
+              ],
+              "region": [
+                0,
+                0,
+                3464,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "leftUpperArm",
+          "parent": "body",
+          "attachment": [
+            1490,
+            790
+          ],
+          "variants": {
+            "default": {
+              "file": "human/human_arms 1.png",
+              "pivot": [
+                1490,
+                790
+              ],
+              "pivotNormalized": [
+                0.43013856812933027,
+                0.22806004618937645
+              ],
+              "region": [
+                1100,
+                0,
+                1732,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "leftForearm",
+          "parent": "leftUpperArm",
+          "attachment": [
+            1260,
+            1440
+          ],
+          "variants": {
+            "default": {
+              "file": "human/human_lowerarms 1.png",
+              "pivot": [
+                1260,
+                1440
+              ],
+              "pivotNormalized": [
+                0.36374133949191684,
+                0.41570438799076215
+              ],
+              "region": [
+                1100,
+                0,
+                1732,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "leftHand",
+          "parent": "leftForearm",
+          "attachment": [
+            1260,
+            1810
+          ],
+          "variants": {
+            "open": {
+              "file": "human/human_hands 1.png",
+              "pivot": [
+                1260,
+                1810
+              ],
+              "pivotNormalized": [
+                0.36374133949191684,
+                0.5225173210161663
+              ],
+              "region": [
+                1100,
+                0,
+                1732,
+                3464
+              ]
+            },
+            "fist": {
+              "file": "human/human_fists 1.png",
+              "pivot": [
+                1260,
+                1810
+              ],
+              "pivotNormalized": [
+                0.36374133949191684,
+                0.5225173210161663
+              ],
+              "region": [
+                1100,
+                0,
+                1732,
+                3464
+              ]
+            },
+            "point": {
+              "file": "human/human_pointed 1.png",
+              "pivot": [
+                1260,
+                1810
+              ],
+              "pivotNormalized": [
+                0.36374133949191684,
+                0.5225173210161663
+              ],
+              "region": [
+                1100,
+                0,
+                1732,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "leftUpperLeg",
+          "parent": "body",
+          "attachment": [
+            1550,
+            1920
+          ],
+          "variants": {
+            "default": {
+              "file": "human/human_knees 1.png",
+              "pivot": [
+                1550,
+                1920
+              ],
+              "pivotNormalized": [
+                0.447459584295612,
+                0.5542725173210161
+              ],
+              "region": [
+                1100,
+                0,
+                1732,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "leftLowerLeg",
+          "parent": "leftUpperLeg",
+          "attachment": [
+            1550,
+            2440
+          ],
+          "variants": {
+            "default": {
+              "file": "human/human_lowerlegs 1.png",
+              "pivot": [
+                1550,
+                2440
+              ],
+              "pivotNormalized": [
+                0.447459584295612,
+                0.7043879907621247
+              ],
+              "region": [
+                1100,
+                0,
+                1732,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "leftFoot",
+          "parent": "leftLowerLeg",
+          "attachment": [
+            1550,
+            3030
+          ],
+          "variants": {
+            "default": {
+              "file": "human/human_feet 1.png",
+              "pivot": [
+                1550,
+                3030
+              ],
+              "pivotNormalized": [
+                0.447459584295612,
+                0.8747113163972287
+              ],
+              "region": [
+                1100,
+                0,
+                1732,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "rightUpperArm",
+          "parent": "body",
+          "attachment": [
+            1970,
+            790
+          ],
+          "variants": {
+            "default": {
+              "file": "human/human_arms 1.png",
+              "pivot": [
+                1970,
+                790
+              ],
+              "pivotNormalized": [
+                0.5687066974595842,
+                0.22806004618937645
+              ],
+              "region": [
+                1732,
+                0,
+                2400,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "rightForearm",
+          "parent": "rightUpperArm",
+          "attachment": [
+            2210,
+            1440
+          ],
+          "variants": {
+            "default": {
+              "file": "human/human_lowerarms 1.png",
+              "pivot": [
+                2210,
+                1440
+              ],
+              "pivotNormalized": [
+                0.6379907621247113,
+                0.41570438799076215
+              ],
+              "region": [
+                1732,
+                0,
+                2400,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "rightHand",
+          "parent": "rightForearm",
+          "attachment": [
+            2210,
+            1810
+          ],
+          "variants": {
+            "open": {
+              "file": "human/human_hands 1.png",
+              "pivot": [
+                2210,
+                1810
+              ],
+              "pivotNormalized": [
+                0.6379907621247113,
+                0.5225173210161663
+              ],
+              "region": [
+                1732,
+                0,
+                2400,
+                3464
+              ]
+            },
+            "fist": {
+              "file": "human/human_fists 1.png",
+              "pivot": [
+                2210,
+                1810
+              ],
+              "pivotNormalized": [
+                0.6379907621247113,
+                0.5225173210161663
+              ],
+              "region": [
+                1732,
+                0,
+                2400,
+                3464
+              ]
+            },
+            "point": {
+              "file": "human/human_pointed 1.png",
+              "pivot": [
+                2210,
+                1810
+              ],
+              "pivotNormalized": [
+                0.6379907621247113,
+                0.5225173210161663
+              ],
+              "region": [
+                1732,
+                0,
+                2400,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "rightUpperLeg",
+          "parent": "body",
+          "attachment": [
+            1900,
+            1920
+          ],
+          "variants": {
+            "default": {
+              "file": "human/human_knees 1.png",
+              "pivot": [
+                1900,
+                1920
+              ],
+              "pivotNormalized": [
+                0.5484988452655889,
+                0.5542725173210161
+              ],
+              "region": [
+                1732,
+                0,
+                2400,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "rightLowerLeg",
+          "parent": "rightUpperLeg",
+          "attachment": [
+            1900,
+            2440
+          ],
+          "variants": {
+            "default": {
+              "file": "human/human_lowerlegs 1.png",
+              "pivot": [
+                1900,
+                2440
+              ],
+              "pivotNormalized": [
+                0.5484988452655889,
+                0.7043879907621247
+              ],
+              "region": [
+                1732,
+                0,
+                2400,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "rightFoot",
+          "parent": "rightLowerLeg",
+          "attachment": [
+            1900,
+            3030
+          ],
+          "variants": {
+            "default": {
+              "file": "human/human_feet 1.png",
+              "pivot": [
+                1900,
+                3030
+              ],
+              "pivotNormalized": [
+                0.5484988452655889,
+                0.8747113163972287
+              ],
+              "region": [
+                1732,
+                0,
+                2400,
+                3464
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "lenny": {
+      "root": [
+        1680,
+        2780
+      ],
+      "bones": [
+        {
+          "id": "body",
+          "parent": null,
+          "attachment": [
+            1680,
+            2780
+          ],
+          "variants": {
+            "front": {
+              "file": "lenny/lenny_body 1.png",
+              "pivot": [
+                1680,
+                2780
+              ],
+              "pivotNormalized": [
+                0.48498845265588914,
+                0.8025404157043879
+              ],
+              "region": [
+                0,
+                0,
+                3464,
+                3464
+              ]
+            },
+            "side": {
+              "file": "lenny/lenny_sideprofile 1.png",
+              "pivot": [
+                1680,
+                2780
+              ],
+              "pivotNormalized": [
+                0.48498845265588914,
+                0.8025404157043879
+              ],
+              "region": [
+                0,
+                0,
+                3464,
+                3464
+              ]
+            },
+            "back": {
+              "file": "lenny/lenny_back 1.png",
+              "pivot": [
+                1680,
+                2780
+              ],
+              "pivotNormalized": [
+                0.48498845265588914,
+                0.8025404157043879
+              ],
+              "region": [
+                0,
+                0,
+                3464,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "head",
+          "parent": "body",
+          "attachment": [
+            1680,
+            1780
+          ],
+          "variants": {
+            "front": {
+              "file": "lenny/lenny_face 1.png",
+              "pivot": [
+                1680,
+                1830
+              ],
+              "pivotNormalized": [
+                0.48498845265588914,
+                0.5282909930715936
+              ],
+              "region": [
+                0,
+                0,
+                3464,
+                3464
+              ]
+            },
+            "side": {
+              "file": "lenny/lenny_sideface 1.png",
+              "pivot": [
+                1680,
+                1620
+              ],
+              "pivotNormalized": [
+                0.48498845265588914,
+                0.4676674364896074
+              ],
+              "region": [
+                900,
+                700,
+                2400,
+                1700
+              ]
+            }
+          }
+        },
+        {
+          "id": "leftUpperArm",
+          "parent": "body",
+          "attachment": [
+            1470,
+            1755
+          ],
+          "variants": {
+            "default": {
+              "file": "lenny/lenny_upperarm 1.png",
+              "pivot": [
+                1470,
+                1755
+              ],
+              "pivotNormalized": [
+                0.424364896073903,
+                0.5066397228637414
+              ],
+              "region": [
+                0,
+                0,
+                1680,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "leftForearm",
+          "parent": "leftUpperArm",
+          "attachment": [
+            1080,
+            2130
+          ],
+          "variants": {
+            "default": {
+              "file": "lenny/lenny_arms 1.png",
+              "pivot": [
+                1160,
+                2160
+              ],
+              "pivotNormalized": [
+                0.3348729792147806,
+                0.6235565819861432
+              ],
+              "region": [
+                0,
+                0,
+                1680,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "leftHand",
+          "parent": "leftForearm",
+          "attachment": [
+            650,
+            2280
+          ],
+          "variants": {
+            "open": {
+              "file": "lenny/lenny_hands 1.png",
+              "pivot": [
+                650,
+                2280
+              ],
+              "pivotNormalized": [
+                0.18764434180138567,
+                0.6581986143187067
+              ],
+              "region": [
+                0,
+                0,
+                1680,
+                3464
+              ]
+            },
+            "fist": {
+              "file": "lenny/lenny_fists 1.png",
+              "pivot": [
+                650,
+                2280
+              ],
+              "pivotNormalized": [
+                0.18764434180138567,
+                0.6581986143187067
+              ],
+              "region": [
+                0,
+                0,
+                1680,
+                3464
+              ]
+            },
+            "point": {
+              "file": "lenny/lenny_point 1.png",
+              "pivot": [
+                650,
+                2280
+              ],
+              "pivotNormalized": [
+                0.18764434180138567,
+                0.6581986143187067
+              ],
+              "region": [
+                0,
+                0,
+                1680,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "leftUpperLeg",
+          "parent": "body",
+          "attachment": [
+            1490,
+            2720
+          ],
+          "variants": {
+            "default": {
+              "file": "lenny/lenny_knees 1.png",
+              "pivot": [
+                1490,
+                2720
+              ],
+              "pivotNormalized": [
+                0.43013856812933027,
+                0.7852193995381063
+              ],
+              "region": [
+                0,
+                0,
+                1680,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "leftLowerLeg",
+          "parent": "leftUpperLeg",
+          "attachment": [
+            1290,
+            2990
+          ],
+          "variants": {
+            "default": {
+              "file": "lenny/lenny_lowerlegs 1.png",
+              "pivot": [
+                1290,
+                2990
+              ],
+              "pivotNormalized": [
+                0.37240184757505773,
+                0.8631639722863741
+              ],
+              "region": [
+                0,
+                0,
+                1680,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "leftFoot",
+          "parent": "leftLowerLeg",
+          "attachment": [
+            1170,
+            3220
+          ],
+          "variants": {
+            "default": {
+              "file": "lenny/lenny_feet 1.png",
+              "pivot": [
+                1170,
+                3220
+              ],
+              "pivotNormalized": [
+                0.3377598152424942,
+                0.9295612009237876
+              ],
+              "region": [
+                0,
+                0,
+                1680,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "rightUpperArm",
+          "parent": "body",
+          "attachment": [
+            1910,
+            1755
+          ],
+          "variants": {
+            "default": {
+              "file": "lenny/lenny_upperarm 1.png",
+              "pivot": [
+                1910,
+                1755
+              ],
+              "pivotNormalized": [
+                0.5513856812933026,
+                0.5066397228637414
+              ],
+              "region": [
+                1680,
+                0,
+                3464,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "rightForearm",
+          "parent": "rightUpperArm",
+          "attachment": [
+            2310,
+            2130
+          ],
+          "variants": {
+            "default": {
+              "file": "lenny/lenny_arms 1.png",
+              "pivot": [
+                2220,
+                2160
+              ],
+              "pivotNormalized": [
+                0.640877598152425,
+                0.6235565819861432
+              ],
+              "region": [
+                1680,
+                0,
+                3464,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "rightHand",
+          "parent": "rightForearm",
+          "attachment": [
+            2700,
+            2280
+          ],
+          "variants": {
+            "open": {
+              "file": "lenny/lenny_hands 1.png",
+              "pivot": [
+                2700,
+                2280
+              ],
+              "pivotNormalized": [
+                0.7794457274826789,
+                0.6581986143187067
+              ],
+              "region": [
+                1680,
+                0,
+                3464,
+                3464
+              ]
+            },
+            "fist": {
+              "file": "lenny/lenny_fists 1.png",
+              "pivot": [
+                2700,
+                2280
+              ],
+              "pivotNormalized": [
+                0.7794457274826789,
+                0.6581986143187067
+              ],
+              "region": [
+                1680,
+                0,
+                3464,
+                3464
+              ]
+            },
+            "point": {
+              "file": "lenny/lenny_point 1.png",
+              "pivot": [
+                2700,
+                2280
+              ],
+              "pivotNormalized": [
+                0.7794457274826789,
+                0.6581986143187067
+              ],
+              "region": [
+                1680,
+                0,
+                3464,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "rightUpperLeg",
+          "parent": "body",
+          "attachment": [
+            1870,
+            2720
+          ],
+          "variants": {
+            "default": {
+              "file": "lenny/lenny_knees 1.png",
+              "pivot": [
+                1870,
+                2720
+              ],
+              "pivotNormalized": [
+                0.539838337182448,
+                0.7852193995381063
+              ],
+              "region": [
+                1680,
+                0,
+                3464,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "rightLowerLeg",
+          "parent": "rightUpperLeg",
+          "attachment": [
+            2110,
+            2990
+          ],
+          "variants": {
+            "default": {
+              "file": "lenny/lenny_lowerlegs 1.png",
+              "pivot": [
+                2110,
+                2990
+              ],
+              "pivotNormalized": [
+                0.609122401847575,
+                0.8631639722863741
+              ],
+              "region": [
+                1680,
+                0,
+                3464,
+                3464
+              ]
+            }
+          }
+        },
+        {
+          "id": "rightFoot",
+          "parent": "rightLowerLeg",
+          "attachment": [
+            2220,
+            3220
+          ],
+          "variants": {
+            "default": {
+              "file": "lenny/lenny_feet 1.png",
+              "pivot": [
+                2220,
+                3220
+              ],
+              "pivotNormalized": [
+                0.640877598152425,
+                0.9295612009237876
+              ],
+              "region": [
+                1680,
+                0,
+                3464,
+                3464
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
