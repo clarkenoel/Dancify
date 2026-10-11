@@ -5,7 +5,7 @@ import { PoseTarget } from './PoseTarget';
 
 export function CameraPanel({ camera, target, active, showTargetSkeleton = false, character = 'lenny' }: { camera: ReturnType<typeof useCamera>; target?: Move; active: boolean; showTargetSkeleton?: boolean; character?: Character }) {
   const missingDevice = camera.deviceId && !camera.devices.some(d => d.deviceId === camera.deviceId);
-  return <section aria-label="Player camera" style={{ minWidth: 0 }}>
+  return <section className="video-panel" aria-label="Player camera" style={{ minWidth: 0 }}>
     <h3>Your camera</h3>
     <div style={{ width: '100%' }}>
       <div style={{ position: 'relative', transform: 'scaleX(-1)' }} aria-label="Mirrored camera view">
@@ -24,7 +24,7 @@ export function CameraPanel({ camera, target, active, showTargetSkeleton = false
     <button onClick={() => void camera.refreshDevices()}>Refresh cameras</button>
     <p>Switching cameras pauses the dance and stops the previous camera. Enable the selected camera to continue.</p>
     <p>
-      <button data-controller onClick={() => void camera.startCamera()} disabled={camera.cameraState !== 'off'}>{camera.cameraState === 'starting' ? 'Starting camera…' : camera.cameraState === 'ready' ? 'Camera on' : 'Enable camera'}</button>{' '}
+      <button className="primary" data-controller onClick={() => void camera.startCamera()} disabled={camera.cameraState !== 'off'}>{camera.cameraState === 'starting' ? 'Starting camera…' : camera.cameraState === 'ready' ? 'Camera on' : 'Enable camera'}</button>{' '}
       <button onClick={camera.stopCamera} disabled={camera.cameraState === 'off'}>Stop camera</button>
     </p>
     <p role="status" aria-label="Body tracking status">{camera.tracking}</p>

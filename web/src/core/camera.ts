@@ -56,12 +56,12 @@ export class CameraTracker {
   }
   constructor(private video: HTMLVideoElement, private capture: () => CaptureStamp, private onPose: (sample: PoseSample) => void, private onError: (message: string) => void, private runtimeLoader = loadRuntime) {}
   async start(deviceId?: string) {
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access requires localhost or HTTPS. Keyboard practice is available.');
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access requires localhost or HTTPS. Camera access is required to play.');
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'user' }), width: { ideal: 640 }, height: { ideal: 480 } } });
       if (this.stopped) { this.stop(); return; }
-      this.stream.getVideoTracks().forEach(track => track.addEventListener('ended', () => { if (!this.stopped) { this.stop(); this.onError('Camera disconnected. Reconnect it or switch to keyboard practice.'); } }));
-      this.armTimeout(60000, 'Camera model startup timed out. Enable the camera again or use keyboard practice.');
+      this.stream.getVideoTracks().forEach(track => track.addEventListener('ended', () => { if (!this.stopped) { this.stop(); this.onError('Camera disconnected. Reconnect it and enable the camera to continue.'); } }));
+      this.armTimeout(60000, 'Camera model startup timed out. Enable the camera again.');
       this.video.srcObject = this.stream; await this.video.play();
       const Constructor = await this.runtimeLoader();
       if (this.stopped || this.expired()) return;
@@ -75,7 +75,7 @@ export class CameraTracker {
       });
       this.operation = detector.initialize(); await this.operation; this.operation = null;
       if (this.stopped || this.expired()) return;
-      this.armTimeout(WARMUP_TIMEOUT_MS, 'Camera tracking startup timed out. Enable the camera again or use keyboard practice.');
+      this.armTimeout(WARMUP_TIMEOUT_MS, 'Camera tracking startup timed out. Enable the camera again.');
       this.lastProgress = performance.now();
       this.frame = requestAnimationFrame(this.loop);
     } catch (error) { this.stop(); throw error; }
@@ -93,7 +93,7 @@ export class CameraTracker {
     // Freeze the webcam frame until inference completes. `now` is solely the
     // model's monotonic timestamp; stamp.time comes from the reference video.
     this.armTimeout(this.warmed ? INFERENCE_TIMEOUT_MS : WARMUP_TIMEOUT_MS,
-      'Body tracking stopped responding. The round is paused. Enable the camera again or use keyboard practice.');
+      'Body tracking stopped responding. The round is paused. Enable the camera again.');
     try { this.operation = this.detector.send({ image: this.canvas }, now); }
     catch (error) { this.fail(error instanceof Error ? error.message : 'Pose tracking failed'); return; }
     void this.operation.then(() => {

@@ -5,6 +5,15 @@
 **Owner:** [Your name]
 **Status:** Active development — 48-hour hackathon build
 
+**Current interaction decision (2026-10-11):** the user removed keyboard gameplay.
+Every new round requires webcam tracking. Remove keyboard practice, key/button
+hits, and global gameplay shortcuts. Native keyboard menu/button accessibility
+remains. The wearable is optional; continuing without it still requires a camera.
+Camera failure offers retry or menu exit. This decision supersedes references to
+keyboard-only gameplay/fallback in the original roadmap below; those passages
+remain historical planning context. Existing practice history stays readable.
+See [the game pages handoff](docs/handoffs/game-pages.md).
+
 This document describes the product vision and target architecture. The shipped
 prep implementation is a narrower hackathon MVP: short, stable, solo-dancer CFR
 clips only. Reference-video multi-person identity isolation, angular-velocity

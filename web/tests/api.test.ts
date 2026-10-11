@@ -30,7 +30,7 @@ it('keeps exact result payload and session key after ambiguous network failure a
   const fetcher = vi.fn().mockRejectedValueOnce(new TypeError('connection dropped')).mockResolvedValueOnce(Response.json({ id: 'saved' }));
   const api = new DancifyApi('http://api', fetcher);
   const first = new ResultOutbox(api, adapter);
-  const session = new GameSession(chart(), 'keyboard_practice'); session.finish();
+  const session = new GameSession(chart()); session.finish();
   const item = first.enqueue('song', session.result('bundle', 'Ada'));
   await expect(first.send(item)).rejects.toThrow();
   const restored = new ResultOutbox(api, adapter); expect(restored.list()).toEqual([item]);

@@ -1,5 +1,5 @@
 import type { Character } from '../pictograms/rig';
-import type { Dance, Mode } from '../core/types';
+import type { Dance } from '../core/types';
 import type { SessionSnapshot } from '../core/session';
 import { PoseTarget } from './PoseTarget';
 
@@ -9,7 +9,7 @@ const pixelsPerSecond = 100;
 const x = (eventTime: number, time: number) => nowX + (eventTime - time) * pixelsPerSecond;
 
 /** All positions derive from the video-driven snapshot; no independent animation clock. */
-export function TimingOverlay({ chart, snapshot: s, mode, showTargetSkeleton = false, character = 'lenny' }: { chart: Dance; snapshot: SessionSnapshot; mode: Mode; showTargetSkeleton?: boolean; character?: Character }) {
+export function TimingOverlay({ chart, snapshot: s, showTargetSkeleton = false, character = 'lenny' }: { chart: Dance; snapshot: SessionSnapshot; showTargetSkeleton?: boolean; character?: Character }) {
   const beats = chart.beat_times.filter(t => t >= s.time - 0.25 && t <= s.time + horizon);
   const windows = chart.moves.filter(m => m.end > s.time && m.start <= s.time + horizon);
   const active = chart.moves.find(m => m.id === s.activeId);
@@ -33,13 +33,13 @@ export function TimingOverlay({ chart, snapshot: s, mode, showTargetSkeleton = f
           const end = Math.min(630, x(m.end, s.time));
           return <g key={m.id} data-checkpoint={m.id}>
             <rect x={start} y="94" width={Math.max(0, end - start)} height="32" fill={m.id === s.activeId ? 'white' : 'none'} stroke="currentColor" strokeWidth="2" />
-            <text x={start + 5} y="115" fontSize="12" fill={m.id === s.activeId ? 'black' : 'white'}>{m.id === s.activeId ? (mode === 'keyboard_practice' ? 'ENTER' : 'MATCH') : '→'}</text>
+            <text x={start + 5} y="115" fontSize="12" fill={m.id === s.activeId ? 'black' : 'white'}>{m.id === s.activeId ? 'MATCH' : '→'}</text>
           </g>;
         })}
       </g>
     </svg>
     <div style={{ padding: '0 8px 8px' }}>
-      <strong>{active ? (mode === 'keyboard_practice' ? 'Press Enter now' : 'Match the target pose now') : next ? `Next pose in ${Math.max(0, next.start - s.time).toFixed(1)}s` : 'No more checkpoints'}</strong>
+      <strong>{active ? 'Match the target pose now' : next ? `Next pose in ${Math.max(0, next.start - s.time).toFixed(1)}s` : 'No more checkpoints'}</strong>
       {' · '}{s.results.at(-1)?.judgment ?? 'Ready'} · Score {s.score} · Combo {s.combo}
     </div>
     {next && <div style={{ position: 'absolute', top: '100%', right: 0, background: 'rgb(0 0 0 / 78%)', maxWidth: '35%' }}>

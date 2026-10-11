@@ -34,13 +34,14 @@ test('known poses and every real prepared checkpoint render with the shipped art
 test('artwork toggle keeps the same video, playback position and score', async ({ page, request }) => {
   const song = await readySong(request);
   await page.goto('/');
+  await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
   await page.getByRole('button', { name: song.title, exact: true }).click();
   await expect(page.locator('[data-renderer="lenny"]').first()).toBeVisible();
   const video = page.getByLabel('Reference video');
   const node = await video.elementHandle();
-  await page.getByRole('button', { name: 'Play / pause', exact: true }).click();
-  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(.2);
-  await page.getByRole('button', { name: 'Play / pause', exact: true }).click();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(2);
+  await video.evaluate((v: HTMLVideoElement) => { v.currentTime = 0.3; });
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.seeking)).toBe(false);
   const position = await video.evaluate((v: HTMLVideoElement) => v.currentTime);
   const score = await page.getByLabel('Score', { exact: true }).textContent();
   await page.getByLabel('Target character').selectOption('human');
@@ -57,17 +58,17 @@ test('artwork toggle keeps the same video, playback position and score', async (
   await expect(page.getByLabel('Score', { exact: true })).toHaveText(score!);
 });
 
-test('failed artwork falls back to targets while a keyboard round can still finish', async ({ page, request }) => {
+test('failed artwork falls back to targets while a real camera round can still finish', async ({ page, request }) => {
   const song = await readySong(request);
   await page.route('**/pictograms/lenny/*.png', route => route.abort());
   await page.goto('/');
+  await page.getByRole('button', { name: 'Choose a song', exact: true }).click();
   await page.getByRole('button', { name: song.title, exact: true }).click();
   await expect(page.getByText('Artwork unavailable; showing skeleton.', { exact: false }).first()).toBeVisible();
   await expect(page.locator('[data-renderer="lenny"]')).toHaveCount(0);
   await expect(page.locator('[data-renderer="skeleton"]').first()).toBeVisible();
-  await page.getByLabel('Reference video').evaluate((v: HTMLVideoElement) => { v.playbackRate = 8; });
-  await page.getByRole('button', { name: 'Play / pause', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Results', exact: true })).toBeVisible({ timeout: 20000 });
+  await page.getByRole('button', { name: 'Enable camera', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Results', exact: true })).toBeVisible({ timeout: 45000 });
 });
 
 

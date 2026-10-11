@@ -1,13 +1,13 @@
-import type { Dance, Judgment, LandmarkTuple, Mode, PlayInput } from './types';
+import type { Dance, Judgment, LandmarkTuple, PlayInput } from './types';
 import { analyzePose } from './pose';
 import { MovementLog, bodyOnly, type SampleDecision } from './movementLog';
 
 export const SCORING_VERSION = 'checkpoint-v2-full-body-provisional';
 export const THRESHOLDS = { PERFECT: 0.94, SUPER: 0.85, GOOD: 0.7 };
 const points = { PERFECT: 1000, SUPER: 700, GOOD: 400, MISS: 0, LOST: 0 };
-export interface MoveResult { id: string; judgment: Judgment; similarity: number | null; bestSampleTime: number | null; source: Mode }
+export interface MoveResult { id: string; judgment: Judgment; similarity: number | null; bestSampleTime: number | null; source: 'camera' }
 export interface SessionSnapshot {
-  sessionId: string; mode: Mode; time: number; duration: number; playing: boolean; ended: boolean; epoch: number;
+  sessionId: string; mode: 'camera'; time: number; duration: number; playing: boolean; ended: boolean; epoch: number;
   score: number; combo: number; maxCombo: number; accuracy: number | null; coverage: number | null;
   results: MoveResult[]; activeId: string | null; upcomingIds: string[]; seeked: boolean;
   judgments: Record<Judgment, number>;
@@ -33,7 +33,8 @@ export class GameSession {
   private combo = 0;
   private maxCombo = 0;
   private sessionId = crypto.randomUUID();
-  constructor(readonly chart: Dance, readonly mode: Mode) {}
+  readonly mode = 'camera' as const;
+  constructor(readonly chart: Dance) {}
   play() { if (!this.ended) this.playing = true; }
   pause() { this.playing = false; this.epoch++; }
   reset() {
@@ -50,7 +51,7 @@ export class GameSession {
   }
   private finalize(id: string) {
     const similarity = this.best.get(id) ?? null;
-    const judgment: Judgment = similarity === null ? (this.mode === 'camera' ? 'LOST' : 'MISS') : judge(similarity);
+    const judgment: Judgment = similarity === null ? 'LOST' : judge(similarity);
     this.results.set(id, { id, judgment, similarity, bestSampleTime: this.bestTimes.get(id) ?? null, source: this.mode });
     this.combo = ['PERFECT', 'SUPER', 'GOOD'].includes(judgment) ? this.combo + 1 : 0;
     this.maxCombo = Math.max(this.maxCombo, this.combo);
@@ -66,8 +67,7 @@ export class GameSession {
   sample(capturedAt: number, epoch: number, pose: LandmarkTuple[] | null, metadata?: { raw?: LandmarkTuple[]; inferenceMs?: number }) {
     const move = this.chart.moves.find(m => capturedAt >= m.start && capturedAt < m.end);
     const decision: SampleDecision = { status: 'accepted', checkpointId: move?.id ?? null, comparison: null };
-    if (this.mode !== 'camera') decision.status = 'wrong_mode';
-    else if (!this.playing) decision.status = 'paused';
+    if (!this.playing) decision.status = 'paused';
     else if (epoch !== this.epoch) decision.status = 'stale_epoch';
     else if (!Number.isFinite(capturedAt) || capturedAt > this.time + 0.05) decision.status = 'future_sample';
     else if (!move) decision.status = 'outside_window';
@@ -81,15 +81,10 @@ export class GameSession {
       }
     }
     // Do not retain late frames from a previous run in the new run's log.
-    if (epoch === this.epoch && !this.ended && this.mode === 'camera') {
+    if (epoch === this.epoch && !this.ended) {
       this.movementLog.record(capturedAt, this.time, epoch, pose, decision, metadata?.raw, metadata?.inferenceMs);
     }
     return decision;
-  }
-  keyboardHit() {
-    if (this.mode !== 'keyboard_practice' || !this.playing) return;
-    const move = this.chart.moves.find(m => this.time >= m.start && this.time < m.end);
-    if (move && !this.skipped.has(move.id) && !this.results.has(move.id)) { this.best.set(move.id, 1); this.bestTimes.set(move.id, this.time); }
   }
   finish() {
     if (this.ended) return;
@@ -108,7 +103,7 @@ export class GameSession {
       results, judgments, score, combo: this.combo, maxCombo: this.maxCombo,
       // Lost tracking remains LOST, but cannot inflate accuracy by shrinking its denominator.
       accuracy: comparable ? sum / Math.max(1, results.length) : null,
-      coverage: this.mode === 'camera' && results.length ? comparable / results.length : null,
+      coverage: results.length ? comparable / results.length : null,
       activeId: this.chart.moves.find(m => this.time >= m.start && this.time < m.end)?.id ?? null,
       upcomingIds: this.chart.moves.filter(m => m.end > this.time).slice(0, 4).map(m => m.id),
       seeked: this.seeked,
@@ -130,7 +125,7 @@ export class GameSession {
     return {
       client_session_id: this.sessionId, bundle_id: bundleId, player_name: playerName.trim() || 'anonymous', mode: this.mode,
       score: s.score, accuracy: s.accuracy, max_combo: s.maxCombo, tracking_coverage: s.coverage, judgments: s.judgments,
-      notes: JSON.stringify({ scoring_version: SCORING_VERSION, pose_runtime: this.mode === 'camera' ? '@mediapipe/pose@0.5.1675469404' : null, thresholds: THRESHOLDS, accuracy_includes_lost: true }),
+      notes: JSON.stringify({ scoring_version: SCORING_VERSION, pose_runtime: '@mediapipe/pose@0.5.1675469404', thresholds: THRESHOLDS, accuracy_includes_lost: true }),
     };
   }
 }

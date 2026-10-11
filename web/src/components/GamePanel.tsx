@@ -1,26 +1,28 @@
 import type { Character } from '../pictograms/rig';
 import { useEffect, useRef, useState } from 'react';
-import type { Bundle, Mode } from '../core/types';
+import type { Bundle } from '../core/types';
 import { useGame } from '../hooks/useGame';
 import type { ResultOutbox } from '../core/outbox';
 import { PoseTarget } from './PoseTarget';
 import { TimingOverlay } from './TimingOverlay';
 import type { WearableClient } from '../core/WearableClient';
 import { CameraPanel } from './CameraPanel';
+import { ConfirmDialog } from './ConfirmDialog';
 
-export function GamePanel({ bundle, mode, wearable, outbox, onResult, onChooseSong, onMainMenu, onEndedChange }: { bundle: Bundle; mode: Mode; wearable: WearableClient; outbox: ResultOutbox; onResult: () => void; onChooseSong: () => void; onMainMenu: () => void; onEndedChange: (ended: boolean) => void }) {
-  const game = useGame(bundle, mode, wearable);
+export function GamePanel({ bundle, wearable, outbox, onResult, onChooseSong, onMainMenu }: { bundle: Bundle; wearable: WearableClient; outbox: ResultOutbox; onResult: () => void; onChooseSong: () => void; onMainMenu: () => void; }) {
+  const [confirmation, setConfirmation] = useState<'restart' | 'library' | 'main' | null>(null);
+  const game = useGame(bundle, wearable, confirmation !== null);
   const s = game.snapshot;
   const [showTiming, setShowTiming] = useState(true);
+  const [volume, setVolume] = useState(1);
+  const confirm = (action: 'restart' | 'library' | 'main') => { game.pause(); setConfirmation(action); };
   const [showTargetSkeleton, setShowTargetSkeleton] = useState(false);
   const [character, setCharacter] = useState<Character>('lenny');
   const recorded = useRef<string | null>(null);
   const resultsRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    onEndedChange(s.ended);
     if (s.ended) resultsRef.current?.focus();
-    return () => onEndedChange(false);
-  }, [s.ended, onEndedChange]);
+  }, [s.ended]);
   useEffect(() => {
     if (!s.ended || s.seeked || recorded.current === s.sessionId) return;
     recorded.current = s.sessionId;
@@ -32,49 +34,50 @@ export function GamePanel({ bundle, mode, wearable, outbox, onResult, onChooseSo
     } catch { /* Storage unavailable: the score and navigation still work. */ }
   }, [s.ended, s.seeked, s.sessionId, bundle.song.id, game, outbox, onResult]);
   const replay = () => { void game.replay(); };
-  return <section aria-label="Game">
-    <h2>{bundle.song.title}</h2>
+  return <section className="game-page" aria-label="Game">
+    <div className="game-heading"><p className="eyebrow">On the dance floor</p><h1>{bundle.song.title}</h1></div>
     {!!bundle.report.checkpoint_quality?.omitted && <p role="status">Preparation omitted {bundle.report.checkpoint_quality.omitted} of {bundle.report.checkpoint_quality.selected} checkpoints because their body tracking could not be scored. {bundle.report.checkpoint_quality.retained} playable checkpoints remain.</p>}
-    {s.ended && <section aria-label="Results" ref={resultsRef} tabIndex={-1}>
-      <h3>Session complete</h3>
-      <p aria-label="Final score"><strong>Final score: {s.score}</strong></p>
+    {s.ended && <section className="results-panel panel" aria-label="Results" ref={resultsRef} tabIndex={-1}>
+      <p className="eyebrow">That’s a wrap</p><h2>Session complete</h2>
+      <p className="final-score" aria-label="Final score"><strong>Final score: {s.score}</strong></p>
       <p>Best combo: {s.maxCombo} · Accuracy: {s.accuracy === null ? 'No comparable poses' : `${(s.accuracy * 100).toFixed(1)}%`}</p>
       <p>{Object.entries(s.judgments).map(([j, n]) => `${j}: ${n}`).join(' · ')}</p>
       {s.seeked && <p>Practice segment — replay from the beginning for a complete round.</p>}
-      <p><button data-controller onClick={replay}><strong>Play again</strong></button>{' '}
+      <p className="action-row"><button className="primary" data-controller onClick={replay}><strong>Play again</strong></button>{' '}
         <button data-controller onClick={onChooseSong}>Choose another song</button>{' '}
         <button data-controller onClick={onMainMenu}>Main menu</button></p>
     </section>}
     <div hidden={s.ended}>
-    {game.controllerWarning && <p role="alert">{game.controllerWarning} <button data-controller onClick={game.useKeyboardControls}>Use keyboard controls</button></p>}
-    {mode === 'camera' && !s.playing && game.countdown === null && <p role="status">{game.waitingForBody ? 'Stand alone with your whole body in frame. After one second of stable tracking, the countdown and video start automatically.' : game.ready ? 'Framing ready. Confirm Ready to start or resume.' : 'Stand alone and keep shoulders, wrists, hips, knees and ankles in view for one second.'}</p>}
-    <p>{mode === 'camera' ? 'Camera scoring' : 'Keyboard practice — separate from camera scores'}</p>
+    {game.controllerWarning && <p role="alert">{game.controllerWarning} <button data-controller onClick={game.continueWithoutController}>Continue without controller</button></p>}
+    {!s.playing && game.countdown === null && <p role="status">{game.waitingForBody ? 'Stand alone with your whole body in frame. After one second of stable tracking, the countdown and video start automatically.' : game.ready ? 'Framing ready. Confirm Ready to start or resume.' : 'Stand alone and keep shoulders, wrists, hips, knees and ankles in view for one second.'}</p>}
+    <p className="mode-label">Camera scoring · Match the dancer</p>
     {bundle.report.cache.source_kind === 'manual' && <p>This bundle was supplied manually with a validated report; its media provenance was not verified by the preparation worker.</p>}
-    <div aria-label="Practice video feeds" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 28rem), 1fr))', gap: '1rem', alignItems: 'start', maxWidth: mode === 'camera' ? 1280 : 640 }}>
-      <section aria-label="Reference player" style={{ minWidth: 0 }}>
-        <h3>Reference dance</h3>
-        {game.countdown !== null && <h2 role="status" aria-label="Replay countdown">Get ready — {game.countdown}</h2>}
-        <div style={{ position: 'relative', width: '100%' }}>
-          <video ref={game.videoRef} src={bundle.videoUrl} controls={mode !== 'camera'} playsInline preload="metadata" width="640" style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', objectFit: 'contain' }} aria-label="Reference video" />
-          {showTiming && <TimingOverlay chart={bundle.chart} snapshot={s} mode={mode} showTargetSkeleton={showTargetSkeleton} character={character} />}
-        </div>
-        <label><input type="checkbox" checked={showTiming} onChange={e => setShowTiming(e.target.checked)} /> Show timing overlay</label>
-        <p><button data-controller disabled={mode === 'camera' && !s.playing && game.countdown === null && !game.ready} onClick={() => void game.toggle()}>{game.countdown !== null ? 'Cancel countdown' : mode === 'camera' ? (s.playing ? 'Pause round' : 'Ready — start / resume') : 'Play / pause'}</button>{' '}<button data-controller disabled={game.countdown !== null} onClick={replay}>Replay round</button></p>
-        {game.error && <p role="alert">{game.error}</p>}
-        <p>Diamonds mark detected music beats. Pose bars mark scoring windows; press Enter during a bar in keyboard practice. Arrow keys still seek. Use this view to check the chart against the music; it does not prove beat detection is correct. Native video fullscreen hides the overlay.</p>
-      </section>
-      {mode === 'camera' && <CameraPanel camera={game.camera} target={bundle.chart.moves.find(m => m.id === (s.activeId ?? s.upcomingIds[0]))} active={s.activeId !== null} showTargetSkeleton={showTargetSkeleton} character={character} />}
-    </div>
-    {mode === 'keyboard_practice' && <p><button onClick={game.hit} disabled={!s.playing}>Hit checkpoint</button> Press Enter during a checkpoint window, or use this button.</p>}
-    <p>Space: play/pause. R: replay. Left/right arrows: seek for practice. Form controls keep their normal keyboard behavior.</p>
+    <div className="game-hud">
     <p aria-label="Playback position">{s.time.toFixed(1)} / {s.duration.toFixed(1)} seconds</p>
     <p>Beat {bundle.chart.beat_times.filter(t => t <= s.time).length} / {bundle.chart.beat_times.length}</p>
-    <p aria-label="Score">Score: {s.score} · Combo: {s.combo} · Best combo: {s.maxCombo}</p>
-    <p aria-live="polite">{s.results.at(-1)?.judgment ?? 'Ready for the first checkpoint'}</p>
-    <p>Accuracy: {s.accuracy === null ? 'No comparable poses yet' : `${(s.accuracy * 100).toFixed(1)}%`}{mode === 'camera' && ` · Tracking coverage: ${s.coverage === null ? '—' : `${(s.coverage * 100).toFixed(1)}%`}`}</p>
+    <p className="score-bar" aria-label="Score">Score: {s.score} · Combo: {s.combo} · Best combo: {s.maxCombo}</p>
+    <p className="judgment" aria-live="polite">{s.results.at(-1)?.judgment ?? 'Ready for the first checkpoint'}</p>
+    <p>Accuracy: {s.accuracy === null ? 'No comparable poses yet' : `${(s.accuracy * 100).toFixed(1)}%`}{` · Tracking coverage: ${s.coverage === null ? '—' : `${(s.coverage * 100).toFixed(1)}%`}`}</p>
+    </div>
+    <div className="video-feeds" aria-label="Dance video feeds">
+      <section className="video-panel" aria-label="Reference player">
+        <h3>Reference dance</h3>
+        <div className="video-stage" style={{ position: 'relative', width: '100%' }}>
+          {game.countdown !== null && <h2 className="countdown" role="status" aria-label="Replay countdown">Get ready — {game.countdown}</h2>}
+          <video ref={game.videoRef} src={bundle.videoUrl} playsInline preload="metadata" width="640" style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', objectFit: 'contain' }} aria-label="Reference video" />
+          {showTiming && <TimingOverlay chart={bundle.chart} snapshot={s} showTargetSkeleton={showTargetSkeleton} character={character} />}
+        </div>
+        <label><input type="checkbox" checked={showTiming} onChange={e => setShowTiming(e.target.checked)} /> Show timing overlay</label>
+        <p><button data-controller disabled={!s.playing && game.countdown === null && !game.ready} onClick={() => void game.toggle()}>{game.countdown !== null ? 'Cancel countdown' : s.playing ? 'Pause round' : 'Ready — start / resume'}</button>{' '}<button data-controller disabled={game.countdown !== null} onClick={() => confirm('restart')}>Replay round</button></p>
+        {game.error && <p role="alert">{game.error}</p>}
+        <p>Diamonds mark detected music beats. Pose bars mark scoring windows. Use this view to check the chart against the music; it does not prove beat detection is correct. Native video fullscreen hides the overlay.</p>
+      </section>
+      <CameraPanel camera={game.camera} target={bundle.chart.moves.find(m => m.id === (s.activeId ?? s.upcomingIds[0]))} active={s.activeId !== null} showTargetSkeleton={showTargetSkeleton} character={character} />
+    </div>
+    <label className="volume-control">Music volume <input type="range" min="0" max="1" step="0.05" value={volume} onChange={event => { const value = Number(event.target.value); setVolume(value); if (game.videoRef.current) game.videoRef.current.volume = value; }} /></label>
     {s.seeked && <p>This is a practice segment. Replay from the beginning to record a complete result.</p>}
     </div>
-    {mode === 'camera' && <details open={!s.ended}><summary>Movement diagnostics</summary>
+    <details><summary>Movement diagnostics</summary>
       <p>Camera scoring matches static checkpoints, not continuous choreography. All 12 body joints must be visible in both poses; missing limbs produce LOST rather than an inflated match. Thresholds remain provisional.</p>
       <label><input type="checkbox" checked={game.movementLog?.enabled ?? true} onChange={e => game.setRecording(e.target.checked)} /> Record body movements locally</label>{' '}
       <button onClick={game.downloadLog}>Download movement log</button>{' '}<button onClick={game.clearLog}>Clear movement log</button>
@@ -83,8 +86,8 @@ export function GamePanel({ bundle, mode, wearable, outbox, onResult, onChooseSo
       <p>The log keeps up to 6,000 samples in memory. It includes body coordinates, confidence, comparison components and checkpoint results; no face landmarks or video. Replay clears it. Movement delta is diagnostic, not an activity score.</p>
       <table><caption>Checkpoint scoring evidence</caption><thead><tr><th>Checkpoint</th><th>Judgment</th><th>Similarity</th><th>Best sample (seconds)</th></tr></thead>
         <tbody>{s.results.map(r => <tr key={r.id}><td>{r.id}</td><td>{r.judgment}</td><td>{r.similarity?.toFixed(4) ?? '—'}</td><td>{r.bestSampleTime?.toFixed(3) ?? '—'}</td></tr>)}</tbody></table>
-    </details>}
-    <div hidden={s.ended}><p><button data-controller onClick={onChooseSong}>Choose another song</button>{' '}<button data-controller onClick={onMainMenu}>Main menu</button></p><details><summary>Simulate wearable controls</summary>
+    </details>
+    <div hidden={s.ended}><p><button data-controller onClick={() => confirm('library')}>Choose another song</button>{' '}<button data-controller onClick={() => confirm('main')}>Main menu</button></p><details><summary>Simulate wearable controls</summary>
       <button onClick={() => game.wearable.simulate({ type: 'togglePlayback' })}>Wearable play / pause</button>{' '}
       <button onClick={() => game.wearable.simulate({ type: 'navigate', direction: 'down' })}>Wearable next item</button>
       <p>Wearable events control navigation and playback only. They never score a checkpoint.</p>
@@ -95,5 +98,6 @@ export function GamePanel({ bundle, mode, wearable, outbox, onResult, onChooseSo
       {s.upcomingIds.map(id => <PoseTarget key={id} move={bundle.chart.moves.find(m => m.id === id)!} showSkeleton={showTargetSkeleton} character={character} />)}
     </section></div>
 
+    {confirmation && <ConfirmDialog title={confirmation === 'restart' ? 'Restart this dance?' : confirmation === 'library' ? 'Choose another song?' : 'Return to main menu?'} onCancel={() => setConfirmation(null)} onConfirm={() => { const action = confirmation; setConfirmation(null); if (action === 'restart') replay(); else if (action === 'library') onChooseSong(); else onMainMenu(); }} />}
   </section>;
 }

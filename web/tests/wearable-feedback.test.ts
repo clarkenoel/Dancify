@@ -8,10 +8,10 @@ class Video extends EventTarget {
   currentTime = 0; paused = true; seeking = false; readyState = 2; playbackRate = 1;
 }
 const flush = async () => { for (let i = 0; i < 50; i++) await Promise.resolve(); };
-async function setup(mode: 'camera' | 'keyboard_practice' = 'camera') {
+async function setup() {
   const video = new Video(); const client = new WearableClient(); client.connectSimulator(); await flush(); client.clearOutput();
   const dance = chart(); dance.duration = 20; dance.beat_times = Array.from({ length: 39 }, (_, i) => .5 + i * .5);
-  const session = new GameSession(dance, mode); let hidden = false; let now = 0;
+  const session = new GameSession(dance); let hidden = false; let now = 0;
   const feedback = new WearableFeedback(video as unknown as HTMLVideoElement, dance, client, () => hidden, () => now);
   const update = async () => { feedback.update(session.snapshot()); await flush(); };
   const advance = async (time: number) => { video.currentTime = time; session.tick(time); now += 100; await update(); };
@@ -34,23 +34,14 @@ it('emits one hit for a real comparable camera result; duplicate updates and LOS
   await f.advance(2.5); expect(f.session.snapshot().results[1].judgment).toBe('LOST');
   expect(f.commands().filter(c => c === 'HIT:1')).toHaveLength(1); f.dispose();
 });
-it('keyboard practice feedback preserves the practice label and never injects camera scores', async () => {
-  const f = await setup('keyboard_practice'); await f.start(); await f.advance(1.1);
-  f.session.keyboardHit(); await f.advance(1.5);
-  expect(f.session.snapshot().results[0].source).toBe('keyboard_practice');
-  expect(f.commands()).toContain('HIT:1'); f.dispose();
-  const camera = await setup(); await camera.start(); await camera.advance(1.1);
-  camera.session.keyboardHit(); await camera.advance(1.5);
-  expect(camera.session.snapshot().score).toBe(0); expect(camera.commands()).not.toContain('HIT:1'); camera.dispose();
-});
 it('pauses silence output, resume reconfigures without old hits, replay permits new judgments', async () => {
-  const f = await setup('keyboard_practice'); await f.start(); await f.advance(1.1); f.session.keyboardHit(); await f.advance(1.5);
+  const f = await setup(); await f.start(); await f.advance(1.1); f.session.sample(f.video.currentTime, f.session.epoch, target()); await f.advance(1.5);
   f.video.paused = true; f.video.dispatchEvent(new Event('pause')); f.session.pause(); await f.update();
   expect(f.commands().at(-1)).toBe('RUN:0'); await f.start();
   expect(f.commands().filter(c => c === 'HIT:1')).toHaveLength(1);
   f.video.paused = true; f.session.reset(); f.video.currentTime = 0; await f.update();
   const beforeCountdown = f.commands().length; await f.update(); expect(f.commands()).toHaveLength(beforeCountdown);
-  await f.start(); await f.advance(1.1); f.session.keyboardHit(); await f.advance(1.5);
+  await f.start(); await f.advance(1.1); f.session.sample(f.video.currentTime, f.session.epoch, target()); await f.advance(1.5);
   expect(f.commands().filter(c => c === 'HIT:1')).toHaveLength(2); f.dispose();
 });
 it('seek, background, results, stalls, playback speed and teardown stop output', async () => {
@@ -66,15 +57,15 @@ it('seek, background, results, stalls, playback speed and teardown stop output',
   }
 });
 it('suspension drops accumulated hit feedback and reconfigures; disconnected results do not catch up', async () => {
-  const f = await setup('keyboard_practice'); await f.start(); await f.advance(1.1); f.session.keyboardHit();
+  const f = await setup(); await f.start(); await f.advance(1.1); f.session.sample(f.video.currentTime, f.session.epoch, target());
   f.suspend(); await f.advance(1.5); expect(f.commands()).not.toContain('HIT:1');
   f.client.disconnect(); f.session.pause(); f.video.paused = true; await f.update();
   f.client.connectSimulator(); await f.update();
   expect(f.commands().at(-1)).toBe('RUN:0'); await f.start(); expect(f.commands()).not.toContain('HIT:1'); f.dispose();
 });
-it('unhit practice checkpoints are MISS and never send feedback', async () => {
-  const f = await setup('keyboard_practice'); await f.start(); await f.advance(1); await f.advance(1.5);
-  expect(f.session.snapshot().results[0].judgment).toBe('MISS');
+it('unobserved camera checkpoints are LOST and never send feedback', async () => {
+  const f = await setup(); await f.start(); await f.advance(1); await f.advance(1.5);
+  expect(f.session.snapshot().results[0].judgment).toBe('LOST');
   expect(f.commands()).not.toContain('HIT:1'); f.dispose();
 });
 it('restoring normal speed and seeking to a new segment reconfigure without replaying earlier results', async () => {

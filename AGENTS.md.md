@@ -20,7 +20,7 @@ Build order: vision first, hardware later. See `PRD.md.md` §3.
 2. Pose comparison returns `null` for insufficient data, never `0`.
 3. Piezo uses LEDC peripheral, never `tone()`.
 4. If the rotary sensor has analog output, use ADC1-capable pins (GPIO 32–39), never ADC2. Confirm the actual sensor interface before assigning pins.
-5. Keyboard fallback must always work.
+5. Camera tracking is required for gameplay (user revision 2026-10-11). Preserve keyboard menu/button accessibility, but do not reintroduce keyboard scoring or global gameplay shortcuts.
 6. The wearable never contributes to the score.
 7. Camera frames never leave the browser.
 8. No **cloud** backend, no auth/accounts, no cloud inference, no model training. The local `/backend` FastAPI + SQLite song cache **is allowed** (see `PRD.md.md` §7 and `backend/README.md`).
@@ -64,7 +64,7 @@ If you need a change outside your directory, stop and tell the human.
 - Changing the master clock source
 - Changing pose comparison return semantics
 - Touching the BLE protocol
-- Breaking keyboard fallback
+- Breaking keyboard menu accessibility
 
 ## Do Without Asking
 

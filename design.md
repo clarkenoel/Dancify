@@ -2,6 +2,11 @@
 
 Last updated: 2026-10-11. Status: first-draft visual direction; Figma is actively changing.
 
+**Interaction update (2026-10-11):** the user removed keyboard gameplay. Camera
+tracking is required for every new round. Keyboard menu/button accessibility
+remains; keyboard scoring and gameplay shortcuts do not. This supersedes the
+practice screens in the older Figma handoff.
+
 This guide records the shared visual language and rules for editing the game UI.
 It is a design reference, not a claim that the redesigned screens have shipped.
 
@@ -146,7 +151,7 @@ variants before implementing or revising them.
   Explain unavailable actions nearby; disabled controls must not trap navigation.
 - Keyboard and rotary focus follow the visible order, keep the active choice in
   view, and never require hover. Enter/select activates the focused menu action.
-  Preserve native field editing and existing gameplay-specific key bindings.
+  Preserve native field editing without adding gameplay-specific key bindings.
 - Dialogs need a visible title, contained focus, Escape/cancel, and focus restoration.
   Give confirmation and cancellation distinct, readable choices.
 
@@ -212,8 +217,8 @@ that preserve the mounted video, camera stream, and current round.
   as a perfect result or change comparison semantics for a visual effect.
 - Show the completed score as soon as the round ends. Saving history happens in
   the background; it never gates results, replay, another song, or main menu.
-- Label keyboard practice separately from camera scoring. Keep its fallback
-  usable without a camera or wearable.
+- All new rounds use camera scoring. A camera error offers retry or menu exit,
+  not keyboard scoring. The controller remains optional.
 - Use real preparation stages and errors; do not fabricate progress percentages,
   songs, results, ratings, or a connected-controller state for the demo.
 - The handoff is older than some runtime features. Readiness and implemented BLE
@@ -255,7 +260,7 @@ keyboard-only navigation, and selection without a mouse.
 6. For UI code changes, run `npm test` and `npm run build` in `web`, plus relevant
    browser tests. For screen/navigation integration, run the complete browser
    integration flow described in [web/README.md](web/README.md), including replay,
-   song changes, camera loss, keyboard fallback, and asset-load failure.
+   song changes, camera loss, menu keyboard accessibility, and asset-load failure.
 7. Keep changes on the feature branch and present screenshots, test outcomes,
    and unresolved design decisions for review before merging.
 

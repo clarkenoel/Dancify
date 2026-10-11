@@ -75,7 +75,7 @@ export class PlaybackController {
   }
   private beginCountdown() {
     if (this.disposed || this.countdown !== null) return;
-    if (!this.canStart()) { this.onError('Stand alone with your whole body visible, then confirm Ready. If the controller disconnected, choose keyboard controls or reconnect.'); return; }
+    if (!this.canStart()) { this.onError('Stand alone with your whole body visible, then confirm Ready. If the controller disconnected, continue without the controller or reconnect.'); return; }
     this.countdown = 3;
     this.onChange();
     // This timer only delays playback. Video currentTime remains the scoring clock.

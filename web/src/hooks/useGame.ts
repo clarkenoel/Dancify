@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Bundle, Mode, PlayInput } from '../core/types';
+import type { Bundle, PlayInput } from '../core/types';
 import { GameSession, type SessionSnapshot } from '../core/session';
 import { PlaybackController } from '../core/playback';
 import type { PoseSample } from '../core/camera';
@@ -9,12 +9,13 @@ import { WearableFeedback } from '../core/wearableFeedback';
 import { BodyReadiness } from '../core/readiness';
 import { cameraFeedback } from '../core/cameraPreview';
 
-export function useGame(bundle: Bundle, mode: Mode, wearable: WearableClient) {
+export function useGame(bundle: Bundle, wearable: WearableClient, interactionBlocked = false) {
+  const blocked = useRef(interactionBlocked); blocked.current = interactionBlocked;
   const videoRef = useRef<HTMLVideoElement>(null);
   const feedback = useRef<WearableFeedback | null>(null);
   const engine = useRef<GameSession | null>(null);
   const controller = useRef<PlaybackController | null>(null);
-  const [snapshot, setSnapshot] = useState<SessionSnapshot>(() => new GameSession(bundle.chart, mode).snapshot());
+  const [snapshot, setSnapshot] = useState<SessionSnapshot>(() => new GameSession(bundle.chart).snapshot());
   const [error, setError] = useState('');
   const readiness = useRef(new BodyReadiness());
   const lossSince = useRef<number | null>(null);
@@ -22,35 +23,26 @@ export function useGame(bundle: Bundle, mode: Mode, wearable: WearableClient) {
   const [controllerWarning, setControllerWarning] = useState('');
   const refresh = useCallback(() => { if (engine.current) { const next = engine.current.snapshot(); feedback.current?.update(next); setSnapshot(engine.current.snapshot()); } }, []);
   useEffect(() => {
-    const session = new GameSession(bundle.chart, mode); engine.current = session;
+    const session = new GameSession(bundle.chart); engine.current = session;
     const video = videoRef.current!;
     const output = new WearableFeedback(video, bundle.chart, wearable); feedback.current = output;
-    const playback = new PlaybackController(video, session, refresh, setError, () => !controllerBlocked.current && (mode !== 'camera' || readiness.current.isReady(performance.now())), mode === 'camera'); controller.current = playback;
+    const playback = new PlaybackController(video, session, refresh, setError, () => !blocked.current && !controllerBlocked.current && readiness.current.isReady(performance.now()), true); controller.current = playback;
     setSnapshot(session.snapshot()); setError('');
     const stopForBackground = () => { if (document.hidden) { output.stop(); readiness.current.reset(); playback.cancelCountdown(); video.pause(); } };
     document.addEventListener('visibilitychange', stopForBackground);
     const unsubscribe = wearable.subscribe(event => {
-      if (event.type === 'togglePlayback') void playback.toggle().catch(e => setError(e.message));
+      if (event.type === 'togglePlayback' && !blocked.current) void playback.toggle().catch(e => setError(e.message));
       else if (event.type === 'connected') { controllerBlocked.current = false; setControllerWarning(''); refresh(); }
       else if (event.type === 'disconnect') {
         controllerBlocked.current = true; playback.cancelCountdown(); video.pause(); session.pause();
-        setControllerWarning('Controller disconnected. Reconnect, or explicitly choose keyboard controls to continue.'); refresh();
+        setControllerWarning('Controller disconnected. Reconnect, or choose Continue without controller.'); refresh();
       }
     });
-    const keyboard = (event: KeyboardEvent) => {
-      const target = event.target;
-      if ((target instanceof HTMLElement && target.closest('input, textarea, select, button, a, [contenteditable="true"]')) || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-      if (event.code === 'Space') { event.preventDefault(); void playback.toggle().catch(e => setError(e.message)); }
-      if (event.code === 'Enter' && mode === 'keyboard_practice') { event.preventDefault(); session.tick(video.currentTime); session.keyboardHit(); refresh(); }
-      if (event.code === 'KeyR') { event.preventDefault(); void playback.replay().catch(e => setError(e.message)); }
-      if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') { event.preventDefault(); video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + (event.code === 'ArrowLeft' ? -5 : 5))); }
-    };
-    window.addEventListener('keydown', keyboard);
     return () => {
       unsubscribe(); output.dispose(); feedback.current = null; playback.dispose(); engine.current = null; controller.current = null;
-      window.removeEventListener('keydown', keyboard); document.removeEventListener('visibilitychange', stopForBackground);
+      document.removeEventListener('visibilitychange', stopForBackground);
     };
-  }, [bundle, mode, refresh, wearable]);
+  }, [bundle, refresh, wearable]);
 
   const capture = useCallback(() => ({ time: videoRef.current?.currentTime ?? 0, epoch: engine.current?.epoch ?? -1 }), []);
   const sample = useCallback((sample: PoseSample) => {
@@ -75,12 +67,12 @@ export function useGame(bundle: Bundle, mode: Mode, wearable: WearableClient) {
     readiness.current.reset(); lossSince.current = null;
     controller.current?.cancelCountdown(); videoRef.current?.pause(); engine.current?.pause(); refresh();
   }, [refresh]);
-  const camera = useCamera(mode === 'camera', capture, sample, stopForCameraChange);
+  const camera = useCamera(true, capture, sample, stopForCameraChange);
   return {
-    ready: mode !== 'camera' || readiness.current.isReady(performance.now()),
-    waitingForBody: controller.current?.waitingForBody ?? mode === 'camera',
+    ready: readiness.current.isReady(performance.now()),
+    waitingForBody: controller.current?.waitingForBody ?? true,
     controllerWarning,
-    useKeyboardControls: () => { controllerBlocked.current = false; setControllerWarning(''); refresh(); },
+    continueWithoutController: () => { controllerBlocked.current = false; setControllerWarning(''); refresh(); },
     videoRef, snapshot, error, camera, wearable, countdown: controller.current?.countdown ?? null,
     movementLog: engine.current?.movementLog,
     setRecording: (enabled: boolean) => { engine.current?.movementLog.setEnabled(enabled); refresh(); },
@@ -93,7 +85,7 @@ export function useGame(bundle: Bundle, mode: Mode, wearable: WearableClient) {
     },
     toggle: () => { setError(''); return controller.current?.toggle().catch(e => setError(e.message)); },
     replay: () => { setError(''); return controller.current?.replay().catch(e => setError(e.message)); },
-    hit: () => { engine.current?.tick(videoRef.current?.currentTime ?? 0); engine.current?.keyboardHit(); refresh(); },
+    pause: () => { controller.current?.cancelCountdown(); videoRef.current?.pause(); engine.current?.pause(); refresh(); },
     result: (name: string): PlayInput => { if (!engine.current) throw new Error('Session is not ready'); return engine.current.result(bundle.id, name); },
   };
 }
