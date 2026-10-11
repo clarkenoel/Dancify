@@ -6,8 +6,6 @@ import type { PoseSample } from '../core/camera';
 import { useCamera } from './useCamera';
 import type { WearableClient } from '../core/WearableClient';
 import { WearableFeedback } from '../core/wearableFeedback';
-import { BodyReadiness } from '../core/readiness';
-import { cameraFeedback } from '../core/cameraPreview';
 
 export function useGame(bundle: Bundle, wearable: WearableClient, interactionBlocked = false) {
   const blocked = useRef(interactionBlocked); blocked.current = interactionBlocked;
@@ -17,9 +15,6 @@ export function useGame(bundle: Bundle, wearable: WearableClient, interactionBlo
   const controller = useRef<PlaybackController | null>(null);
   const [snapshot, setSnapshot] = useState<SessionSnapshot>(() => new GameSession(bundle.chart).snapshot());
   const [error, setError] = useState('');
-  const readiness = useRef(new BodyReadiness());
-  const lossSince = useRef<number | null>(null);
-  const controllerBlocked = useRef(false);
   const [controllerWarning, setControllerWarning] = useState('');
   const refresh = useCallback(() => { if (engine.current) { const next = engine.current.snapshot(); feedback.current?.update(next); setSnapshot(engine.current.snapshot()); } }, []);
   useEffect(() => {
@@ -29,16 +24,16 @@ export function useGame(bundle: Bundle, wearable: WearableClient, interactionBlo
     // explicit development opt-in; controller input and results cues still work.
     const output = new WearableFeedback(video, bundle.chart, wearable, undefined, undefined,
       import.meta.env.VITE_DANCIFY_WEARABLE_METRONOME === 'true'); feedback.current = output;
-    const playback = new PlaybackController(video, session, refresh, setError, () => !blocked.current && !controllerBlocked.current && readiness.current.isReady(performance.now()), true); controller.current = playback;
+    const playback = new PlaybackController(video, session, refresh, setError, () => !blocked.current && !document.hidden, true, false); controller.current = playback;
     setSnapshot(session.snapshot()); setError('');
-    const stopForBackground = () => { if (document.hidden) { output.stop(); readiness.current.reset(); playback.cancelCountdown(); video.pause(); } };
+    const stopForBackground = () => { if (document.hidden) { output.stop(); playback.cancelCountdown(); video.pause(); } };
     document.addEventListener('visibilitychange', stopForBackground);
     const unsubscribe = wearable.subscribe(event => {
       if (event.type === 'togglePlayback' && !blocked.current) void playback.toggle().catch(e => setError(e.message));
-      else if (event.type === 'connected') { controllerBlocked.current = false; setControllerWarning(''); refresh(); }
+      else if (event.type === 'connected') { setControllerWarning(''); refresh(); }
       else if (event.type === 'disconnect') {
-        controllerBlocked.current = true; playback.cancelCountdown(); video.pause(); session.pause();
-        setControllerWarning('Controller disconnected. Reconnect, or choose Continue without controller.'); refresh();
+        playback.cancelCountdown(); video.pause(); session.pause();
+        setControllerWarning('Controller disconnected. Press Start to continue, or reconnect from Settings.'); refresh();
       }
     });
     return () => {
@@ -50,32 +45,23 @@ export function useGame(bundle: Bundle, wearable: WearableClient, interactionBlo
   const capture = useCallback(() => ({ time: videoRef.current?.currentTime ?? 0, epoch: engine.current?.epoch ?? -1 }), []);
   const sample = useCallback((sample: PoseSample) => {
     const session = engine.current;
-    const now = performance.now();
-    const fullBody = cameraFeedback(sample.raw, sample.pose !== null).fullBody && sample.pose !== null;
-    readiness.current.update(fullBody, now);
-    if (!document.hidden) controller.current?.observeReadiness();
-    if (fullBody) lossSince.current = null;
-    else {
-      lossSince.current ??= now;
-      if (session?.snapshot().playing && now - lossSince.current >= 750) {
-        controller.current?.cancelCountdown(); videoRef.current?.pause(); session.pause();
-        setError('Body tracking was lost. Step into view, then confirm Ready to resume.');
-      }
-    }
+    // Demo: framing never gates playback. Missing landmarks remain unscored.
     session?.tick(videoRef.current?.currentTime ?? 0);
     session?.sample(sample.time, sample.epoch, sample.pose, { raw: sample.raw, inferenceMs: sample.inferenceMs });
     refresh();
   }, [refresh]);
   const stopForCameraChange = useCallback(() => {
-    readiness.current.reset(); lossSince.current = null;
-    controller.current?.cancelCountdown(); videoRef.current?.pause(); engine.current?.pause(); refresh();
+    // Invalidate pending camera samples without stopping the demo video.
+    engine.current?.pause();
+    if (videoRef.current && !videoRef.current.paused) engine.current?.play();
+    refresh();
   }, [refresh]);
   const camera = useCamera(true, capture, sample, stopForCameraChange);
   return {
-    ready: readiness.current.isReady(performance.now()),
-    waitingForBody: controller.current?.waitingForBody ?? true,
+    ready: !interactionBlocked,
+    waitingForBody: false,
     controllerWarning,
-    continueWithoutController: () => { controllerBlocked.current = false; setControllerWarning(''); refresh(); },
+    continueWithoutController: () => { setControllerWarning(''); refresh(); },
     videoRef, snapshot, error, camera, wearable, countdown: controller.current?.countdown ?? null,
     movementLog: engine.current?.movementLog,
     setRecording: (enabled: boolean) => { engine.current?.movementLog.setEnabled(enabled); refresh(); },
@@ -86,9 +72,9 @@ export function useGame(bundle: Bundle, wearable: WearableClient, interactionBlo
       const link = document.createElement('a'); link.href = url; link.download = `dancify-movement-${engine.current.snapshot().sessionId}.json`;
       link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
-    toggle: () => { setError(''); return controller.current?.toggle().catch(e => setError(e.message)); },
+    toggle: () => { setError(''); setControllerWarning(''); if (camera.cameraState === 'off') void camera.startCamera(); return controller.current?.toggle().catch(e => setError(e.message)); },
     replay: () => { setError(''); return controller.current?.replay().catch(e => setError(e.message)); },
     pause: () => { controller.current?.cancelCountdown(); videoRef.current?.pause(); engine.current?.pause(); refresh(); },
-    result: (name: string): PlayInput => { if (!engine.current) throw new Error('Session is not ready'); return engine.current.result(bundle.id, name); },
+    result: (name: string): PlayInput => { if (!engine.current) throw new Error('Session is not ready'); const result = engine.current.result(bundle.id, name); return { ...result, notes: 'Upper-body demo scoring (shoulders, elbows, wrists). ' + result.notes }; },
   };
 }

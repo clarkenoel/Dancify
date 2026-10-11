@@ -59,7 +59,7 @@ export function useCamera(enabled: boolean, capture: () => CaptureStamp, onPose:
       setFeedback(info); setInferenceMs(Math.round(sample.inferenceMs));
       if (sample.pose) {
         seen.current = true;
-        setTracking(info.fullBody ? 'Ready — tracking body' : 'Tracking body — adjust framing');
+        setTracking(info.upperBody ? 'Tracking upper body' : 'Tracking — bring your arms into view');
       } else setTracking(seen.current ? 'Tracking lost' : 'Finding your body');
       onPose(sample);
     }, failed);

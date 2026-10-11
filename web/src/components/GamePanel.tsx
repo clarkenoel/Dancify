@@ -85,8 +85,8 @@ export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onR
     </section>}
     <div hidden={s.ended}>
     {game.controllerWarning && <p role="alert">{game.controllerWarning} <button data-controller onClick={game.continueWithoutController}>Continue without controller</button></p>}
-    {!s.playing && game.countdown === null && <p role="status">{game.waitingForBody ? 'Stand alone with your whole body in frame. After one second of stable tracking, the countdown and video start automatically.' : game.ready ? 'Framing ready. Confirm Ready to start or resume.' : 'Stand alone and keep shoulders, wrists, hips, knees and ankles in view for one second.'}</p>}
-    <p className="mode-label">Camera scoring · Match the dancer</p>
+    {!s.playing && game.countdown === null && <p role="status">{'Click Start whenever you are ready. The dance begins after 3–2–1. Keep shoulders, elbows and wrists visible for scoring; legs are optional.'}</p>}
+    <p className="mode-label">Upper-body demo scoring · Match the dancer</p>
     {bundle.report.cache.source_kind === 'manual' && <p>This bundle was supplied manually with a validated report; its media provenance was not verified by the preparation worker.</p>}
     <div className="game-hud">
     <p aria-label="Playback position">{s.time.toFixed(1)} / {s.duration.toFixed(1)} seconds</p>
@@ -103,7 +103,7 @@ export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onR
           <video ref={game.videoRef} src={bundle.videoUrl} playsInline preload="metadata" width="640" style={{ display: 'block', width: '100%', aspectRatio: '16 / 9', objectFit: 'contain' }} aria-label="Reference video" />
         </div>
 
-        <p><button data-controller disabled={!s.playing && game.countdown === null && !game.ready} onClick={() => void game.toggle()}>{game.countdown !== null ? 'Cancel countdown' : s.playing ? 'Pause round' : 'Ready — start / resume'}</button>{' '}<button data-controller disabled={game.countdown !== null} onClick={() => confirm('restart')}>Replay round</button></p>
+        <p><button data-controller onClick={() => void game.toggle()}>{game.countdown !== null ? 'Cancel countdown' : s.playing ? 'Pause round' : s.time > 0 ? 'Resume dance' : 'Start dance'}</button>{' '}<button data-controller disabled={game.countdown !== null} onClick={() => confirm('restart')}>Replay round</button></p>
         {game.error && <p role="alert">{game.error}</p>}
       </section>
       <CameraPanel camera={game.camera} target={bundle.chart.moves.find(m => m.id === (s.activeId ?? s.upcomingIds[0]))} active={s.activeId !== null} showTargetSkeleton={showTargetSkeleton} character={character} />
@@ -125,15 +125,15 @@ export function GamePanel({ bundle, wearable, outbox, onSound, onStopSounds, onR
       <p role="status">Wearable · {wearableState.status}{wearableState.simulated ? ' (simulated)' : ''}</p>
       {!wearable.supported && <p className="help">Bluetooth requires desktop Chrome or Edge on localhost or HTTPS. The controller is optional.</p>}
       {wearableState.error && <p role="alert">{wearableState.error}</p>}
-      <p className="help">The round stays paused when you return. Confirm Ready to resume.</p>
+      <p className="help">The round stays paused when you return. Click Start or Resume dance.</p>
     </ToolsDialog>}
     <ToolsDialog open={tools === 'developer'} title="Developer tools" subtitle="Testing controls kept separate from the player experience." onClose={() => setTools(null)}>
       <div className="developer-grid"><section>    <details><summary>Movement diagnostics</summary>
-      <p>Camera scoring matches static checkpoints, not continuous choreography. All 12 body joints must be visible in both poses; missing limbs produce LOST rather than an inflated match. Thresholds remain provisional.</p>
+      <p>Camera scoring matches static checkpoints, not continuous choreography. Demo scoring uses shoulders, elbows and wrists in both poses. Legs are optional; missing arms produce LOST rather than invented points. Thresholds remain provisional.</p>
       <label><input type="checkbox" checked={game.movementLog?.enabled ?? true} onChange={e => game.setRecording(e.target.checked)} /> Record body movements locally</label>{' '}
       <button onClick={game.downloadLog}>Download movement log</button>{' '}<button onClick={game.clearLog}>Clear movement log</button>
       <p>Samples: {game.movementLog?.count ?? 0} · Older samples dropped: {game.movementLog?.dropped ?? 0} · Latest: {game.movementLog?.latest?.decision.status ?? 'Waiting for camera'}</p>
-      <p>Comparison: {game.movementLog?.latest?.decision.comparison?.reason ?? '—'} · Matched joints: {game.movementLog?.latest?.decision.comparison?.matchedJoints.length ?? 0}/12 · Movement delta: {game.movementLog?.latest?.movementDelta?.toFixed(4) ?? '—'}</p>
+      <p>Comparison: {game.movementLog?.latest?.decision.comparison?.reason ?? '—'} · Matched joints: {game.movementLog?.latest?.decision.comparison?.matchedJoints.length ?? 0}/6 · Movement delta: {game.movementLog?.latest?.movementDelta?.toFixed(4) ?? '—'}</p>
       <p>The log keeps up to 6,000 samples in memory. It includes body coordinates, confidence, comparison components and checkpoint results; no face landmarks or video. Replay clears it. Movement delta is diagnostic, not an activity score.</p>
       <table><caption>Checkpoint scoring evidence</caption><thead><tr><th>Checkpoint</th><th>Judgment</th><th>Similarity</th><th>Best sample (seconds)</th></tr></thead>
         <tbody>{s.results.map(r => <tr key={r.id}><td>{r.id}</td><td>{r.judgment}</td><td>{r.similarity?.toFixed(4) ?? '—'}</td><td>{r.bestSampleTime?.toFixed(3) ?? '—'}</td></tr>)}</tbody></table>

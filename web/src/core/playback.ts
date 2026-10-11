@@ -12,8 +12,8 @@ export class PlaybackController {
   private autoStartPending: boolean;
   private automaticCountdown = false;
   private handlers: [string, EventListener][] = [];
-  constructor(readonly video: HTMLVideoElement, readonly session: GameSession, private onChange: () => void, private onError: (message: string) => void, private canStart: () => boolean = () => true, private requireCountdown = false) {
-    this.autoStartPending = requireCountdown;
+  constructor(readonly video: HTMLVideoElement, readonly session: GameSession, private onChange: () => void, private onError: (message: string) => void, private canStart: () => boolean = () => true, private requireCountdown = false, private automaticStart = requireCountdown) {
+    this.autoStartPending = requireCountdown && automaticStart;
     this.listen('playing', () => { if (!this.compatible || this.countdown !== null || !this.canStart() || (this.requireCountdown && !this.armed)) { video.pause(); return; } session.play(); onChange(); });
     this.listen('pause', () => { this.armed = false; session.pause(); onChange(); });
     this.listen('waiting', () => { session.pause(); onChange(); });
@@ -69,13 +69,13 @@ export class PlaybackController {
     if (this.disposed || this.countdown !== null) return;
     this.video.pause(); this.session.reset(); this.replaying = true;
     if (this.video.currentTime !== 0) this.video.currentTime = 0; else this.replaying = false;
-    this.autoStartPending = this.requireCountdown;
+    this.autoStartPending = this.requireCountdown && this.automaticStart;
     this.onChange();
-    if (this.requireCountdown) this.observeReadiness(); else this.beginCountdown();
+    if (this.requireCountdown && this.automaticStart) this.observeReadiness(); else this.beginCountdown();
   }
   private beginCountdown() {
     if (this.disposed || this.countdown !== null) return;
-    if (!this.canStart()) { this.onError('Stand alone with your whole body visible, then confirm Ready. If the controller disconnected, continue without the controller or reconnect.'); return; }
+    if (!this.canStart()) { this.onError('Close the open menu and press Start to begin.'); return; }
     this.countdown = 3;
     this.onChange();
     // This timer only delays playback. Video currentTime remains the scoring clock.
@@ -84,7 +84,7 @@ export class PlaybackController {
       if (!this.canStart()) {
         const retryWhenReady = this.automaticCountdown;
         this.cancelCountdown(); this.autoStartPending = retryWhenReady; this.onChange();
-        if (!retryWhenReady) this.onError('Readiness changed. Check your position and confirm Ready again.');
+        if (!retryWhenReady) this.onError('Start was interrupted. Close the menu and press Start again.');
         return;
       }
       if (this.countdown > 1) {

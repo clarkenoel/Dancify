@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 // Figma confirmation states: 16-1745, 16-1810, 36-883.
-export function ConfirmDialog({ title, description = 'The current round will end. Your unfinished score will not be saved.', help = 'Cancelling keeps the round paused. Confirm Ready when you want to continue.', confirmLabel = 'Confirm', onCancel, onConfirm }: { title: string; description?: string; help?: string; confirmLabel?: string; onCancel: () => void; onConfirm: () => void }) {
+export function ConfirmDialog({ title, description = 'The current round will end. Your unfinished score will not be saved.', help = 'Cancelling keeps the round paused. Click Resume dance when you want to continue.', confirmLabel = 'Confirm', onCancel, onConfirm }: { title: string; description?: string; help?: string; confirmLabel?: string; onCancel: () => void; onConfirm: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const cancel = useRef<HTMLButtonElement>(null);
   useEffect(() => {

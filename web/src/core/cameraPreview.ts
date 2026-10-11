@@ -1,5 +1,5 @@
 import type { LandmarkTuple } from './types';
-import { GAMEPLAY_JOINTS } from './pose';
+import { GAMEPLAY_JOINTS, DEMO_JOINTS } from './pose';
 
 export const BODY_EDGES = [[11, 12], [11, 13], [13, 15], [12, 14], [14, 16], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28]];
 export const inFrame = (p: LandmarkTuple | undefined) => !!p && p.every(Number.isFinite) && p[3] >= 0.35 && p[0] >= 0 && p[0] <= 1 && p[1] >= 0 && p[1] <= 1;
@@ -7,9 +7,10 @@ export const inFrame = (p: LandmarkTuple | undefined) => !!p && p.every(Number.i
 export function cameraFeedback(raw: LandmarkTuple[], comparable: boolean) {
   const visible = GAMEPLAY_JOINTS.filter(i => inFrame(raw[i])).length;
   const fullBody = visible === GAMEPLAY_JOINTS.length;
-  return { visible, fullBody, comparable, guidance: fullBody
-    ? 'Your shoulders, arms, hips and legs are in view.'
-    : 'Step back and improve lighting until shoulders, wrists, hips, knees and ankles are visible.' };
+  const upperBody = DEMO_JOINTS.every(i => inFrame(raw[i]));
+  return { visible, fullBody, upperBody, comparable, guidance: upperBody
+    ? 'Upper body in view. Legs are optional for this demo.'
+    : 'Keep shoulders, elbows and wrists in view for scoring. You can press Start at any time.' };
 }
 
 /** Draw the skeleton on the exact frozen frame used by inference. Mirroring is presentation-only. */
@@ -41,7 +42,7 @@ export function paintCameraPreview(canvas: HTMLCanvasElement, frame: HTMLCanvasE
 
 export function cameraErrorMessage(error: unknown): string {
   const name = error instanceof Error ? error.name : '';
-  if (name === 'NotAllowedError' || name === 'SecurityError') return 'Camera permission was denied. Allow camera access in your browser site settings, then try again. Camera access is required to play.';
+  if (name === 'NotAllowedError' || name === 'SecurityError') return 'Camera permission was denied. Allow camera access in your browser site settings, then try again. You can still start the dance; camera scoring resumes when tracking is available.';
   if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'The selected camera is unavailable. Refresh the camera list and choose another camera.';
   if (name === 'NotReadableError') return 'The camera could not be opened. Close other apps using it, then try again.';
   return error instanceof Error ? error.message : 'Camera access failed. Check camera access and try again.';
