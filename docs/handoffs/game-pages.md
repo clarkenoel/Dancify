@@ -64,8 +64,8 @@ button readability from the dance position, and visual proportions.
 
 ## Merge boundary and CI limitation
 
-Only the design guide is being merged separately. The character integration PR
-(#7) has intermittent GitHub real-camera test failures: the software-rendered
+Only the design guide was merged to main in [PR #8](https://github.com/clarkenoel/justmakeit/pull/8), commit `e9149a1`. The character integration PR
+(#7, now draft) has intermittent GitHub real-camera test failures: the software-rendered
 model can exceed the production 2.5-second inference deadline during startup.
 One duplicate run passes while another stops safely before automatic playback.
 A longer overall test budget covers multiple bounded recovery phases but does

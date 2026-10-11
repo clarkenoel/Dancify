@@ -5,7 +5,9 @@ Last updated: 2026-10-11. Status: first-draft visual direction; Figma is activel
 **Interaction update (2026-10-11):** the user removed keyboard gameplay. Camera
 tracking is required for every new round. Keyboard menu/button accessibility
 remains; keyboard scoring and gameplay shortcuts do not. This supersedes the
-practice screens in the older Figma handoff.
+practice screens in the older Figma handoff. This is the new product direction;
+the camera-only pages remain on a feature branch pending review, and the current
+main application may still expose the older practice interface.
 
 This guide records the shared visual language and rules for editing the game UI.
 It is a design reference, not a claim that the redesigned screens have shipped.
@@ -15,7 +17,7 @@ It is a design reference, not a claim that the redesigned screens have shipped.
 - [Dancify Figma file](https://www.figma.com/design/73KXHiJcCoHRsR5XK54kQ7/Dancify-Roller-Rink-Redesign)
 - [Foundations](https://www.figma.com/design/73KXHiJcCoHRsR5XK54kQ7/Dancify-Roller-Rink-Redesign?page-id=9-273&node-id=12-237)
 - [Designer handoff snapshot](https://github.com/taliyadenis/justmakeit/blob/ea39c042507fec5a8040660a9c5393ee1c530c69/docs/design/figma-handoff.md)
-- [Local imported handoff](docs/design/figma-handoff.md), which predates the linked snapshot.
+- [Imported handoff on the character branch](https://github.com/clarkenoel/justmakeit/blob/803192e/docs/design/figma-handoff.md), which predates the linked snapshot.
 - [Gameplay integration contract](docs/handoffs/gameplay-integration-contract.md) and [current web behavior](web/README.md).
 
 Evidence: the linked GitHub handoff was read at commit
@@ -180,8 +182,8 @@ Review their placement against the latest larger-button revision.
 ## Characters and video composition
 
 Use the existing articulated renderer and the artist's original Human/Lenny
-parts. [Palette JSON](web/src/pictograms/palette.json) is the implementation source
-for baked character colors; [integration notes](docs/handoffs/pictogram-integration.md)
+parts. [Palette JSON](https://github.com/clarkenoel/justmakeit/blob/803192e/web/src/pictograms/palette.json) is the implementation source
+for baked character colors; [integration notes](https://github.com/clarkenoel/justmakeit/blob/803192e/docs/handoffs/pictogram-integration.md)
 describe the rig, regeneration, and fallback behavior.
 
 | Character | Approved treatment |
