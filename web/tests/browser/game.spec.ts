@@ -96,7 +96,9 @@ test('round ends with an immediate score and navigation even when history fails'
 });
 
 test('official local model renders the dancer skeleton, switches cameras and cleans up', async ({ browser, request }) => {
-  test.setTimeout(150000);
+  // Several independently bounded model startups plus recovery can exceed 150s on CI.
+  // Per-operation assertions and the production 2.5s watchdog remain unchanged.
+  test.setTimeout(240000);
   // A real media fixture through getUserMedia, not mocked landmarks or a physical camera.
   const context = await browser.newContext({ permissions: ['camera'] });
   const page = await context.newPage();
